@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useOrders } from '@/hooks/useOrders';
-import { Order } from '@/types/order';
+import { Order, Comment } from '@/types/order';
 import Header from '@/components/Header';
 
 const OrderDetail = () => {
@@ -10,6 +10,7 @@ const OrderDetail = () => {
   const { orders, loading, error } = useOrders();
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [newComment, setNewComment] = useState('');
 
   const order = orders.find((o) => o.OrderId === Number(id));
 
@@ -36,7 +37,7 @@ const OrderDetail = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`https://localhost:7049/api/order/${id}/status`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -59,6 +60,48 @@ const OrderDetail = () => {
       setNotification({ 
         type: 'error', 
         message: err instanceof Error ? err.message : 'Failed to update order status' 
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!id || !newComment.trim()) return;
+    
+    setIsUpdating(true);
+    setNotification(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          Text: newComment.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add comment');
+      }
+
+      setNotification({ type: 'success', message: 'Comment added successfully' });
+      setNewComment('');
+      setTimeout(() => {
+        router.reload();
+      }, 1500);
+    } catch (err) {
+      setNotification({ 
+        type: 'error', 
+        message: err instanceof Error ? err.message : 'Failed to add comment' 
       });
     } finally {
       setIsUpdating(false);
@@ -226,6 +269,70 @@ const OrderDetail = () => {
                 </div>
               </div>
 
+              {/* Shipping Address Card */}
+              {order.Address && (
+                <div className="bg-white rounded-xl shadow-md p-8">
+                  <h2 className="text-2xl font-bold text-black mb-6">Shipping Address</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-gray-600 text-lg mb-1">Street</p>
+                      <p className="text-black text-xl">{order.Address.Street}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-gray-600 text-lg mb-1">City</p>
+                        <p className="text-black text-xl">{order.Address.City}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 text-lg mb-1">State</p>
+                        <p className="text-black text-xl">{order.Address.State}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-gray-600 text-lg mb-1">Pincode</p>
+                        <p className="text-black text-xl">{order.Address.Pincode}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 text-lg mb-1">Country</p>
+                        <p className="text-black text-xl">{order.Address.Country}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Billing Address Card */}
+              <div className="bg-white rounded-xl shadow-md p-8">
+                <h2 className="text-2xl font-bold text-black mb-6">Billing Address</h2>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-gray-600 text-lg mb-1">Street</p>
+                    <p className="text-black text-xl">123 Business Park, Suite 456</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-gray-600 text-lg mb-1">City</p>
+                      <p className="text-black text-xl">Mumbai</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 text-lg mb-1">State</p>
+                      <p className="text-black text-xl">Maharashtra</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-gray-600 text-lg mb-1">Pincode</p>
+                      <p className="text-black text-xl">400001</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 text-lg mb-1">Country</p>
+                      <p className="text-black text-xl">India</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Order Items Card */}
               <div className="bg-white rounded-xl shadow-md p-8">
                 <h2 className="text-2xl font-bold text-black mb-6">Order Items</h2>
@@ -304,6 +411,53 @@ const OrderDetail = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Comments Section - Now at the bottom */}
+          <div className="mt-8">
+            <div className="bg-white rounded-xl shadow-md p-8">
+              <h2 className="text-2xl font-bold text-black mb-6">Comments</h2>
+              
+              {/* Add Comment Form */}
+              <div className="mb-8">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-lg"
+                  rows={4}
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={isUpdating || !newComment.trim()}
+                  className="mt-4 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isUpdating ? 'Adding...' : 'Add Comment'}
+                </button>
+              </div>
+
+              {/* Comments List */}
+              <div className="space-y-6">
+                {order.Comments && order.Comments.length > 0 ? (
+                  order.Comments.map((comment) => (
+                    <div key={comment.CommentId} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
+                      <p className="text-black text-lg mb-2">{comment.Text}</p>
+                      <p className="text-gray-500 text-sm">
+                        {new Date(comment.CreatedAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-lg">No comments yet</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

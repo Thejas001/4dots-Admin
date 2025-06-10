@@ -24,6 +24,22 @@ export interface Shipment {
   ShippingStatus: string;
 }
 
+export interface Address {
+  Street: string;
+  City: string;
+  State: string;
+  Pincode: string;
+  Country: string;
+}
+
+export interface Comment {
+  CommentId: number;
+  OrderId: number;
+  Text: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
 export interface Order {
   OrderId: number;
   UserId: number;
@@ -34,6 +50,8 @@ export interface Order {
   Payment: Payment | null;
   Shipment: Shipment | null;
   Items: OrderItem[];
+  Address: Address | null;
+  Comments: Comment[];
 }
 
 export interface OrderResponse {
