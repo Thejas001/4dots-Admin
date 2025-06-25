@@ -24,12 +24,13 @@ export interface Shipment {
   ShippingStatus: string;
 }
 
-export interface Address {
-  Street: string;
+export interface UserAddress {
+  Id: number;
+  Address: string;
   City: string;
-  State: string;
-  Pincode: string;
   Country: string;
+  PinCode: string;
+  IsPrimary: boolean;
 }
 
 export interface Comment {
@@ -42,21 +43,37 @@ export interface Comment {
 
 export interface Order {
   OrderId: number;
-  UserId: number;
+  UserId: string;
+  UserName: string | null;
+  UserAddress: UserAddress | null;
   TotalAmount: number;
   OrderStatus: string;
   CreatedAt: string;
-  UpdatedAt: string;
-  Payment: Payment | null;
-  Shipment: Shipment | null;
+  Payment: {
+    OrderPaymentId: number;
+    OrderId: number;
+    PaymentMethod: string;
+    PaymentStatus: string;
+    PaymentDate: string;
+  } | null;
+  Shipment: {
+    OrderShipmentId: number;
+    OrderId: number;
+    ShippingStatus: string;
+  } | null;
   Items: OrderItem[];
-  Address: Address | null;
   Comments: Comment[];
 }
 
 export interface OrderResponse {
   Success: boolean;
   Data: Order[];
+  TotalCount: number;
+  PageNumber: number;
+  PageSize: number;
+  TotalPages: number;
+  HasPreviousPage: boolean;
+  HasNextPage: boolean;
 }
 
 export interface Document {

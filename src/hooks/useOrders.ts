@@ -27,24 +27,32 @@ export const useOrders = (): UseOrdersReturn => {
       setLoading(true);
       setError(null);
       console.log('Fetching orders...');
-      const response = await api.get<OrderResponse>('/order/user');
-      console.log('API Response:', response.data);
-      
+      const response = await api.get<OrderResponse>('/order/orders?pageNumber=1&pageSize=10');
+      console.log('Raw API Response:', JSON.stringify(response, null, 2));
+      console.log('API Response Data:', JSON.stringify(response.data, null, 2));
+
       if (response.data.Success) {
-        console.log('Orders data:', response.data.Data);
-        setOrders(response.data.Data);
+        const ordersWithDefaults = response.data.Data.map(order => ({
+          ...order,
+          Comments: order.Comments || [], // Default to empty array if Comments is missing
+        }));
+        console.log('Orders data:', JSON.stringify(ordersWithDefaults, null, 2));
+        console.log('First order:', JSON.stringify(ordersWithDefaults[0], null, 2));
+        console.log('First order UserAddress:', JSON.stringify(ordersWithDefaults[0]?.UserAddress, null, 2));
+        
+        // Log each order's ID and UserAddress
+        ordersWithDefaults.forEach(order => {
+          console.log(`Order ${order.OrderId} UserAddress:`, JSON.stringify(order.UserAddress, null, 2));
+        });
+
+        setOrders(ordersWithDefaults);
       } else {
         console.error('API returned error:', response.data);
         setError('Failed to fetch orders');
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Error fetching orders:', err);
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { data?: { message?: string } } };
-        setError(axiosError.response?.data?.message || 'Failed to fetch orders');
-      } else {
-        setError('An unexpected error occurred');
-      }
+      setError('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
@@ -58,4 +66,4 @@ export const useOrders = (): UseOrdersReturn => {
   }, [isAuthenticated]);
 
   return { orders, loading, error, refetch: fetchOrders };
-}; 
+};
