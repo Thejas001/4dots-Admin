@@ -64,7 +64,7 @@ const OrderDetail = () => {
   
       const requestBody = { OrderStatus: newStatus };
   
-      const response = await fetch(`https://localhost:7049/api/order/${id}/status`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -478,7 +478,8 @@ const OrderDetail = () => {
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`https://localhost:7049/api/order/comment`, {
+    const response = await fetch(`https://fourdotsapp.azurewebsites.net
+      /api/order/comment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
