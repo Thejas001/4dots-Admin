@@ -6,7 +6,8 @@ import Header from './Header';
 
 const OrderList = () => {
   const router = useRouter();
-  const { orders, loading, error } = useOrders();
+  const [pageNumber, setPageNumber] = useState(1);
+  const { orders, loading, error, pagination, refetch } = useOrders(pageNumber, 10);
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewedOrders, setViewedOrders] = useState<Set<number>>(new Set());
@@ -18,6 +19,11 @@ const OrderList = () => {
       setViewedOrders(new Set(JSON.parse(storedViewedOrders)));
     }
   }, []);
+
+  useEffect(() => {
+    refetch(pageNumber, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageNumber]);
 
   useEffect(() => {
     console.log('OrderList - Current orders:', orders);
@@ -88,9 +94,13 @@ const OrderList = () => {
       case 'Failed':
         return 'bg-red-100 text-red-800';
       case 'Shipped':
-        return 'bg-gray-100 text-gray-800';
-      case 'Cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-gray-800';
+      case 'CancelledByUser':
+        return 'bg-red-200 text-gray-800';
+      case 'Completed':
+        return 'bg-blue-100 text-gray-800';
+      case 'PaymentSuccessful':
+        return 'bg-green-200 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -225,6 +235,25 @@ const OrderList = () => {
             <p className="text-gray-500 text-xl">No orders found</p>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <div className="flex justify-center mt-4 gap-2">
+          <button
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+            onClick={() => setPageNumber((prev) => Math.max(1, prev - 1))}
+            disabled={pageNumber === 1}
+          >
+            Previous
+          </button>
+          <span className="px-4 py-2">Page {pagination.PageNumber} of {pagination.TotalPages}</span>
+          <button
+            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+            onClick={() => setPageNumber((prev) => Math.min(pagination.TotalPages, prev + 1))}
+            disabled={pageNumber === pagination.TotalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </>
   );

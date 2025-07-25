@@ -12,6 +12,9 @@ const OrderDetail = () => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [newComment, setNewComment] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+  const [trackingIdInput, setTrackingIdInput] = useState('');
+const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
+
 
   // Update currentOrder when orders or id changes
   useEffect(() => {
@@ -96,6 +99,7 @@ const OrderDetail = () => {
       setIsUpdating(false);
     }
   };
+
 
   const getStatusValueFromLabel = (label: string): number => {
     const found = statusOptions.find(option => option.label === label);
@@ -363,7 +367,7 @@ const OrderDetail = () => {
               <div className="space-y-6">
                 {currentOrder.Comments?.map((comment, index) => (
                   <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                    <p className="text-black text-xl">{comment.Text}</p>
+                    <p className="text-black text-lg">{comment.Text ?? (comment as any)['CommentText']}</p>
                   </div>
                 ))}
                 <div className="mt-6">
@@ -411,17 +415,38 @@ const OrderDetail = () => {
             {/* Shipping Information Card */}
             {currentOrder?.Shipment && (
               <div className="bg-white rounded-xl shadow-md p-8 mt-8">
-                <h2 className="text-2xl font-bold text-black mb-6">Shipping Information</h2>
+                <h2 className="text-2xl font-bold text-black mb-6">Order Information</h2>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-gray-600 text-lg mb-1">Shipping Status</p>
+                    <p className="text-gray-600 text-lg mb-1">Order Status</p>
                     <p className="text-black text-xl font-semibold">{currentOrder.OrderStatus}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            
+            <div className="bg-white rounded-xl shadow-md p-8 mt-8">
+              <h2 className="text-2xl font-bold text-black mb-6">Shipment Information</h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-600 text-lg mb-1">Tracking Id</p>
+                </div>
+                {/* Input field and button for entering tracking ID */}
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    placeholder="Enter tracking ID"
+                    className="w-full p-1 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                  <button
+                    className="mt-3 px-3 py-1 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg"
+                  >
+                    Update Tracking ID
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -430,12 +455,12 @@ const OrderDetail = () => {
 
   const statusOptions = [
     { value: 1, label: 'Pending' },
-    { value: 2, label: 'In Progress' },
-    { value: 4, label: 'Cancelled By Admin' },
-    { value: 5, label: 'Shipped' },
-    { value: 6, label: 'Delivered' },
-    { value: 8, label: 'Failed' },
-    { value: 10, label: 'Completed' }
+    { value: 5, label: 'In Progress' },
+    { value: 7, label: 'Cancelled By Admin' },
+    { value: 8, label: 'Shipped' },
+    { value: 9, label: 'Delivered' },
+    { value: 11, label: 'Failed' },
+    { value: 13, label: 'Completed' },
   ];
 
   const getStatusStyle = (status: string) => {
