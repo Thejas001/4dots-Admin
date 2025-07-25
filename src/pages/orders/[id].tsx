@@ -431,13 +431,10 @@ const OrderDetail = () => {
   const statusOptions = [
     { value: 1, label: 'Pending' },
     { value: 2, label: 'In Progress' },
-    { value: 3, label: 'Cancelled By User' },
     { value: 4, label: 'Cancelled By Admin' },
     { value: 5, label: 'Shipped' },
     { value: 6, label: 'Delivered' },
-    { value: 7, label: 'Cancelled' },
     { value: 8, label: 'Failed' },
-    { value: 9, label: 'On Hold' },
     { value: 10, label: 'Completed' }
   ];
 
@@ -478,8 +475,7 @@ const OrderDetail = () => {
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`https://fourdotsapp.azurewebsites.net
-      /api/order/comment`, {
+    const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/comment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
