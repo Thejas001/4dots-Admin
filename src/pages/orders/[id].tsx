@@ -214,25 +214,23 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
             <div className="bg-white rounded-xl shadow-md p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-black">Order Status</h2>
-                {(() => {
-                  console.log('Rendering status dropdown with value:', currentOrder?.OrderStatus);
-                  return (
-                    <select
-                      className={`px-6 py-3 rounded-lg text-lg font-semibold ${getStatusStyle(currentOrder?.OrderStatus || '')} border-0 focus:ring-2 focus:ring-black min-w-[200px]`}
-                      value={getStatusValueFromLabel(currentOrder?.OrderStatus || '')}
-                      onChange={(e) => updateOrderStatus(Number(e.target.value))}
-                      disabled={isUpdating}
-                    >
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
 
-                  );
-                })()}
+                {currentOrder?.OrderStatus !== "PaymentFailed" && (
+                  <select
+                    className={`px-6 py-3 rounded-lg text-lg font-semibold ${getStatusStyle(currentOrder?.OrderStatus || '')} border-0 focus:ring-2 focus:ring-black min-w-[200px]`}
+                    value={getStatusValueFromLabel(currentOrder?.OrderStatus || '')}
+                    onChange={(e) => updateOrderStatus(Number(e.target.value))}
+                    disabled={isUpdating}
+                  >
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
+
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-gray-600 text-lg mb-2">Order Date</p>
@@ -425,13 +423,14 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
               </div>
             )}
 
+            {/* Input field and button for entering tracking ID 
             <div className="bg-white rounded-xl shadow-md p-8 mt-8">
               <h2 className="text-2xl font-bold text-black mb-6">Shipment Information</h2>
               <div className="space-y-4">
                 <div>
                   <p className="text-gray-600 text-lg mb-1">Tracking Id</p>
                 </div>
-                {/* Input field and button for entering tracking ID */}
+                
                 <div className="mt-2">
                   <input
                     type="text"
@@ -444,8 +443,10 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
                     Update Tracking ID
                   </button>
                 </div>
+
+                
               </div>
-            </div>
+            </div>*/}
 
           </div>
         </div>

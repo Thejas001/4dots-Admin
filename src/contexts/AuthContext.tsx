@@ -11,6 +11,7 @@ interface AuthContextType extends AuthState {
   sendOTP: (phoneNumber: string) => Promise<void>;
   verifyOTP: (phoneNumber: string, otp: string) => Promise<void>;
   logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     token: null,
     phoneNumber: null,
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check for token in localStorage on mount
@@ -40,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Configure axios defaults for future requests
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
+    setLoading(false);
   }, []);
 
   const sendOTP = async (phoneNumber: string) => {
@@ -123,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendOTP,
         verifyOTP,
         logout,
+        loading,
       }}
     >
       {children}

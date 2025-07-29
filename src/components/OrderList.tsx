@@ -101,6 +101,8 @@ const OrderList = () => {
         return 'bg-blue-100 text-gray-800';
       case 'PaymentSuccessful':
         return 'bg-green-200 text-gray-800';
+      case 'PaymentFailed':
+        return 'bg-red-500 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
