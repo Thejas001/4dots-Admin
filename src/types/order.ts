@@ -3,6 +3,14 @@ export interface OrderAttribute {
   AttributeValue: string;
 }
 
+export interface Addon {
+  OrderItemAddonId: number;
+  OrderItemId: number;
+  AddonId: number;
+  AddonName: string;
+  NumberOfBooks: number;
+}
+
 export interface OrderItem {
   OrderItemId: number;
   OrderId: number;
@@ -13,6 +21,7 @@ export interface OrderItem {
   Documents: Document[];
   Attributes: OrderAttribute[];
   DynamicAttributes: OrderAttribute[];
+  Addons?: Addon[];
 }
 
 export interface Payment {

@@ -309,6 +309,43 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
                         <h3 className="text-xl font-bold text-black mb-2">{item.ProductName}</h3>
                         <p className="text-gray-600 text-lg">Quantity: {item.Quantity}</p>
                         <p className="text-gray-600 text-lg">Price: ₹{item.Price}</p>
+                        {/* Attributes */}
+                        {item.Attributes && item.Attributes.length > 0 && (
+                          <div className="mt-2">
+                            <p className="font-semibold text-black">Details:</p>
+                            <ul className="ml-4 list-disc text-gray-700">
+                              {item.Attributes.map((attr: any) => (
+                                <li key={attr.OrderItemAttributeId || attr.AttributeName}>
+                                  {attr.AttributeName}: {attr.AttributeValue}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {/* Addons */}
+                        {item.Addons && item.Addons.length > 0 && (
+                          <div className="mt-2">
+                            <ul className="ml-4 list-disc text-gray-700">
+                              {item.Addons.map((addon: any) => (
+                                <li key={addon.OrderItemAddonId || addon.AddonName}>
+                                  {addon.AddonName}{addon.NumberOfBooks ? `: ${addon.NumberOfBooks} books` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {/* DynamicAttributes */}
+                        {item.DynamicAttributes && item.DynamicAttributes.length > 0 && (
+                          <div className="mt-2">
+                            <ul className="ml-4 list-disc text-gray-700">
+                              {item.DynamicAttributes.map((dyn: any, i: number) => (
+                                <li key={dyn.AttributeName + i}>
+                                  {dyn.AttributeName}: {dyn.AttributeValue}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-black text-xl font-semibold">
