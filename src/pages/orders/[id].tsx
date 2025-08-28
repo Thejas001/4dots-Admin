@@ -279,7 +279,9 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
               <div className="space-y-4">
                 <div>
                   <p className="text-gray-600 text-lg mb-1">Address</p>
-                  <p className="text-black text-xl">{currentOrder?.UserAddress?.Address || 'No address available'}</p>
+                        <p className="text-black text-xl break-words whitespace-normal">
+                          {currentOrder?.UserAddress?.Address || 'No address available'}
+                        </p>
                 </div>
                 <div>
                   <p className="text-gray-600 text-lg mb-1">City</p>
