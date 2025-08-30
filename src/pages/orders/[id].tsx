@@ -67,7 +67,7 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
   
       const requestBody = { OrderStatus: newStatus };
   
-      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
+      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -540,7 +540,7 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/comment`, {
+    const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/comment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

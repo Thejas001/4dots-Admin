@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       console.log('Sending OTP request:', requestData);
-      const response = await axios.post('https://fourdotsapp.azurewebsites.net/api/account/register-or-login', requestData);
+      const response = await axios.post('https://fourdotsapp-prod.azurewebsites.net/api/account/register-or-login', requestData);
       
       setAuthState(prev => ({ ...prev, phoneNumber }));
       localStorage.setItem('phone_number', phoneNumber);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Verifying OTP request:', requestData);
       const response = await axios.post<AuthResponse>(
-        'https://fourdotsapp.azurewebsites.net/api/account/verify-otp',
+        'https://fourdotsapp-prod.azurewebsites.net/api/account/verify-otp',
         requestData
       );
 
