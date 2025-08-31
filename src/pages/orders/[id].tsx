@@ -215,7 +215,6 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-black">Order Status</h2>
 
-                {currentOrder?.OrderStatus !== "PaymentFailed" && (
                   <select
                     className={`px-6 py-3 rounded-lg text-lg font-semibold ${getStatusStyle(currentOrder?.OrderStatus || '')} border-0 focus:ring-2 focus:ring-black min-w-[200px]`}
                     value={getStatusValueFromLabel(currentOrder?.OrderStatus || '')}
@@ -228,7 +227,6 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
                       </option>
                     ))}
                   </select>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -495,8 +493,9 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
 
   const statusOptions = [
     { value: 1, label: 'Pending' },
+    { value: 3, label: 'PaymentSuccessful' },
     { value: 5, label: 'In Progress' },
-    { value: 7, label: 'Cancelled By Admin' },
+    { value: 7, label: 'Cancelled By Admin' }, 
     { value: 8, label: 'Shipped' },
     { value: 9, label: 'Delivered' },
     { value: 11, label: 'Failed' },
