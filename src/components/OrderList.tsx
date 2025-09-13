@@ -11,6 +11,7 @@ const OrderList = () => {
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewedOrders, setViewedOrders] = useState<Set<number>>(new Set());
+  
 
   useEffect(() => {
     // Load viewed orders from localStorage
@@ -19,6 +20,12 @@ const OrderList = () => {
       setViewedOrders(new Set(JSON.parse(storedViewedOrders)));
     }
   }, []);
+
+  // In OrderList
+;
+
+
+  
 
   useEffect(() => {
     refetch(pageNumber, 10);
@@ -31,18 +38,20 @@ const OrderList = () => {
     console.log('OrderList - Error:', error);
   }, [orders, loading, error]);
 
-  const handleOrderClick = (orderId: number) => {
-    // Add order to viewed orders
-    const newViewedOrders = new Set(viewedOrders);
-    newViewedOrders.add(orderId);
-    setViewedOrders(newViewedOrders);
-    
-    // Save to localStorage
-    localStorage.setItem('viewedOrders', JSON.stringify(Array.from(newViewedOrders)));
-    
-    // Navigate to order details
-    router.push(`/orders/${orderId}`);
-  };
+const handleOrderClick = (order: Order) => {
+  // Add order to viewed orders
+  const newViewedOrders = new Set(viewedOrders);
+  newViewedOrders.add(order.OrderId);
+  setViewedOrders(newViewedOrders);
+
+  // Save to localStorage
+  localStorage.setItem('viewedOrders', JSON.stringify(Array.from(newViewedOrders)));
+
+  // Navigate to order details and pass full order in query
+router.push(`/orders/${order.OrderId}`);
+
+};
+
 
   const filteredOrders = orders
     .filter((order) => {
@@ -196,7 +205,7 @@ const OrderList = () => {
               {filteredOrders.map((order) => (
                 <tr 
                   key={order.OrderId}
-                  onClick={() => handleOrderClick(order.OrderId)}
+                  onClick={() => handleOrderClick(order)}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td className="px-10 py-6 whitespace-nowrap text-base font-medium text-gray-900">
