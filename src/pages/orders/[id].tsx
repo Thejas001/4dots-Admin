@@ -238,6 +238,10 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
                   <p className="text-gray-600 text-lg mb-2">Total Amount</p>
                   <p className="text-black text-xl font-semibold">₹{currentOrder?.TotalAmount}</p>
                 </div>
+                <div>
+                  <p className="text-gray-600 text-lg mb-2">Delivery Type</p>
+                  <p className="text-black text-xl font-semibold">{currentOrder?.DeliveryType || 'Not specified'}</p>
+                </div>
               </div>
             </div>
 
@@ -294,6 +298,10 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
                     <p className="text-gray-600 text-lg mb-1">Country</p>
                     <p className="text-black text-xl">{currentOrder?.UserAddress?.Country || 'No country available'}</p>
                   </div>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-lg mb-1">Phone Number</p>
+                  <p className="text-black text-xl">{currentOrder?.UserAddress?.PhoneNumber || 'No phone number available'}</p>
                 </div>
               </div>
             </div>

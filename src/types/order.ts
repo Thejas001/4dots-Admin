@@ -40,6 +40,7 @@ export interface UserAddress {
   Country: string;
   PinCode: string;
   IsPrimary: boolean;
+  PhoneNumber?: string;
 }
 
 export interface Comment {
@@ -58,6 +59,7 @@ export interface Order {
   TotalAmount: number;
   OrderStatus: string;
   CreatedAt: string;
+  DeliveryType?: string;
   Payment: {
     OrderPaymentId: number;
     OrderId: number;
