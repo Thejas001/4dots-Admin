@@ -280,6 +280,10 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
               <h2 className="text-2xl font-bold text-black mb-6">Billing Address</h2>
               <div className="space-y-4">
                 <div>
+                  <p className="text-gray-600 text-lg mb-1">Customer Name</p>
+                  <p className="text-black text-xl font-semibold">{currentOrder?.UserName || 'No name available'}</p>
+                </div>
+                <div>
                   <p className="text-gray-600 text-lg mb-1">Address</p>
                         <p className="text-black text-xl break-words whitespace-normal">
                           {currentOrder?.UserAddress?.Address || 'No address available'}
