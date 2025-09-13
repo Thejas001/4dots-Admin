@@ -1,9 +1,10 @@
 {
   "/_app": "pages/_app.js",
+  "/": "pages/index.html",
+  "/login": "pages/login.html",
+  "/orders/[id]": "pages/orders/[id].html",
+  "/orders": "pages/orders.html",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-  "/login": "pages/login.js",
-  "/orders": "pages/orders.js",
-  "/orders/[id]": "pages/orders/[id].js"
+  "/404": "pages/404.html"
 }
