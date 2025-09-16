@@ -35,6 +35,7 @@ export interface Shipment {
 
 export interface UserAddress {
   Id: number;
+  Name: string;
   Address: string;
   City: string;
   Country: string;

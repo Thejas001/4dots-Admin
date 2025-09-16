@@ -14,45 +14,23 @@ const OrderDetail = () => {
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [trackingIdInput, setTrackingIdInput] = useState('');
 const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
+const orderFromQuery = router.query.order ? JSON.parse(router.query.order as string) : null;
 
-
+useEffect(() => {
+  if (orderFromQuery) {
+    setCurrentOrder(orderFromQuery);
+  } else {
+    // fallback fetch (will fail unless you add /order/:id API)
+  }
+}, [orderFromQuery]);
   // Update currentOrder when orders or id changes
-  useEffect(() => {
-    if (orders && id) {
-      const foundOrder = orders.find((o) => o.OrderId === Number(id));
-      setCurrentOrder(foundOrder || null);
-    }
-  }, [orders, id]);
 
-  useEffect(() => {
-    console.log('Updated orders after refetch:', orders);
-    console.log('Rebound currentOrder:', currentOrder);
-  }, [orders, currentOrder]);
-
-  useEffect(() => {
-    console.log('Current ID from router:', id);
-    console.log('All Orders:', JSON.stringify(orders, null, 2));
-    console.log('Current Order:', JSON.stringify(currentOrder, null, 2));
-  }, [id, orders, currentOrder]);
-
-  // Debug log for UserAddress
-  useEffect(() => {
-    console.log('UserAddress:', JSON.stringify(currentOrder?.UserAddress, null, 2));
-  }, [currentOrder]);
-  
-  
-  // Debug logs
-  useEffect(() => {
-    console.log('Current ID from router:', id);
-    console.log('All Orders:', orders);
-    console.log('Current Order:', currentOrder);
-  }, [id, orders, currentOrder]);
-
-  // Debug logs for dropdown rendering
-  useEffect(() => {
-    console.log('Dropdown Status Value:', currentOrder?.UserAddress);
-
-  }, [currentOrder]);
+useEffect(() => {
+  if (orders && id) {
+    const foundOrder = orders.find((o) => o.OrderId === Number(id));
+    setCurrentOrder(foundOrder || null);
+  }
+}, [orders, id])
 
 
   const updateOrderStatus = async (newStatus: number) => {
@@ -281,9 +259,9 @@ const [isUpdatingTrackingId, setIsUpdatingTrackingId] = useState(false);
               <div className="space-y-4">
                 <div>
                   <p className="text-gray-600 text-lg mb-1">Customer Name</p>
-                  <p className="text-black text-xl font-semibold">{currentOrder?.UserName || 'No name available'}</p>
+                  <p className="text-black text-xl font-semibold">{currentOrder?.UserAddress?.Name  || 'No name available'}</p>
                 </div>
-                <div>
+                <div>``
                   <p className="text-gray-600 text-lg mb-1">Address</p>
                         <p className="text-black text-xl break-words whitespace-normal">
                           {currentOrder?.UserAddress?.Address || 'No address available'}
