@@ -5,6 +5,7 @@ import { Order, Comment } from '@/types/order';
 import Header from '@/components/Header';
 
 const OrderDetail = () => {
+
   const router = useRouter();
   const { id } = router.query;
   const { orders, loading, error } = useOrders();
@@ -13,6 +14,23 @@ const OrderDetail = () => {
   const [newComment, setNewComment] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Safely parse JSON responses that might be empty or non-JSON
+  const parseJsonIfPossible = async (response: Response): Promise<any | null> => {
+    if (response.status === 204) return null;
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      // Prefer JSON when indicated, but attempt parse regardless if body is present
+      if (contentType.includes('application/json')) {
+        return JSON.parse(text);
+      }
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
 
   // Memoize orderFromQuery to prevent new object references on every render
   const orderFromQuery = useMemo(() => {
@@ -30,13 +48,22 @@ const OrderDetail = () => {
   }, [id, orderFromQuery, orders, currentOrder, loading, error]);
 
   // Fetch a single order by ID
-  const fetchOrderById = async (orderId: number) => {
-    console.log('fetchOrderById - Fetching order with ID:', orderId);
+  const fetchOrderById = async (orderId: number, silentError: boolean = false) => {
+    console.log('fetchOrderById - Fetching order with ID:', orderId, 'silentError:', silentError);
     try {
       setDetailLoading(true);
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        throw new Error('No authentication token found');
+        console.warn('fetchOrderById - No auth token found');
+        if (!silentError) {
+          setNotification({
+            type: 'error',
+            message: 'Authentication required. Please log in again.',
+          });
+        }
+        setCurrentOrder(null);
+        setDetailLoading(false);
+        return;
       }
 
       const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${orderId}`, {
@@ -48,20 +75,52 @@ const OrderDetail = () => {
       });
 
       console.log('fetchOrderById - Response status:', response.status);
-      const responseData = await response.json();
+      const responseData = await parseJsonIfPossible(response);
       console.log('fetchOrderById - Response data:', responseData);
 
       if (!response.ok) {
-        throw new Error(responseData.message || 'Failed to fetch order details');
+        let message = '';
+        if (response.status === 404) {
+          message = `Order #${orderId} not found. It may have been deleted or the ID is incorrect.`;
+        } else if (response.status === 401 || response.status === 403) {
+          message = 'Authentication failed. Please log in again.';
+        } else {
+          message = (responseData && (responseData.message || responseData.error)) || `Failed to fetch order details (HTTP ${response.status})`;
+        }
+        console.warn(`fetchOrderById - API error: ${message}`);
+        if (!silentError) {
+          setNotification({
+            type: 'error',
+            message,
+          });
+        }
+        setCurrentOrder(null);
+        setDetailLoading(false);
+        return;
       }
 
-      setCurrentOrder(responseData);
+      if (!responseData) {
+        console.warn('fetchOrderById - Empty response from server');
+        if (!silentError) {
+          setNotification({
+            type: 'error',
+            message: 'Server returned an empty response. Please try again.',
+          });
+        }
+        setCurrentOrder(null);
+        setDetailLoading(false);
+        return;
+      }
+
+      setCurrentOrder(responseData as Order);
     } catch (err) {
-      console.error('fetchOrderById - Error:', err);
-      setNotification({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to fetch order details',
-      });
+      console.error('fetchOrderById - Unexpected error:', err);
+      if (!silentError) {
+        setNotification({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'An unexpected error occurred while fetching order details',
+        });
+      }
       setCurrentOrder(null);
     } finally {
       setDetailLoading(false);
@@ -112,6 +171,7 @@ const OrderDetail = () => {
 
       const requestBody = { OrderStatus: newStatus };
 
+      console.log('updateOrderStatus - Updating order', id, 'to status', newStatus);
       const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
@@ -121,15 +181,29 @@ const OrderDetail = () => {
         body: JSON.stringify(requestBody),
       });
 
-      const responseData = await response.json();
-      console.log('updateOrderStatus - Response:', responseData);
+      const responseData = await parseJsonIfPossible(response);
+      console.log('updateOrderStatus - Response status:', response.status);
+      console.log('updateOrderStatus - Response data:', responseData);
 
       if (!response.ok) {
-        throw new Error(responseData.message || 'Failed to update order status');
+        const message = (responseData && (responseData.message || responseData.error)) || `Failed to update order status (HTTP ${response.status})`;
+        throw new Error(message);
+      }
+
+      // Update was successful - update the local order status optimistically
+      if (currentOrder) {
+        const statusLabel = statusOptions.find(opt => opt.value === newStatus)?.label || 'Unknown';
+        setCurrentOrder({
+          ...currentOrder,
+          OrderStatus: statusLabel,
+        });
       }
 
       setNotification({ type: 'success', message: 'Order status updated successfully' });
-      await fetchOrderById(Number(id));
+      
+      // Try to refetch silently, but don't show error if it fails (status update already succeeded)
+      console.log('updateOrderStatus - Attempting to refetch order data');
+      await fetchOrderById(Number(id), true);
     } catch (err) {
       console.error('updateOrderStatus - Error:', err);
       setNotification({
@@ -171,7 +245,7 @@ const OrderDetail = () => {
 
       setNotification({ type: 'success', message: 'Comment added successfully' });
       setNewComment('');
-      await fetchOrderById(Number(id));
+      await fetchOrderById(Number(id), true);
     } catch (err) {
       console.error('handleAddComment - Error:', err);
       setNotification({
