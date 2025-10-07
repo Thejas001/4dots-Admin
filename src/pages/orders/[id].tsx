@@ -14,6 +14,12 @@ const OrderDetail = () => {
   const [newComment, setNewComment] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [shippingData, setShippingData] = useState({
+    trackingNumber: '',
+    trackingUrl: '',
+    deliveryPartner: ''
+  });
 
   // Safely parse JSON responses that might be empty or non-JSON
   const parseJsonIfPossible = async (response: Response): Promise<any | null> => {
@@ -162,6 +168,17 @@ const OrderDetail = () => {
   const updateOrderStatus = async (newStatus: number) => {
     if (!id) return;
 
+    // If status is "Shipped", show modal instead of direct API call
+    if (newStatus === 8) {
+      setShippingData({
+        trackingNumber: '',
+        trackingUrl: '',
+        deliveryPartner: ''
+      });
+      setShowShippingModal(true);
+      return;
+    }
+
     setIsUpdating(true);
     setNotification(null);
 
@@ -206,6 +223,73 @@ const OrderDetail = () => {
       await fetchOrderById(Number(id), true);
     } catch (err) {
       console.error('updateOrderStatus - Error:', err);
+      setNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to update order status',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleShippingSubmit = async () => {
+    if (!id || !shippingData.trackingNumber.trim() || !shippingData.deliveryPartner.trim()) {
+      setNotification({
+        type: 'error',
+        message: 'Please fill in all required fields (Tracking Number and Delivery Partner)'
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    setNotification(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) throw new Error('No authentication token found');
+
+      const requestBody = {
+        OrderStatus: 8, // Shipped
+        TrackingNumber: shippingData.trackingNumber.trim(),
+        TrackingUrl: shippingData.trackingUrl.trim(),
+        DeliveryPartner: shippingData.deliveryPartner.trim()
+      };
+
+      console.log('handleShippingSubmit - Updating order with shipping details:', requestBody);
+      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const responseData = await parseJsonIfPossible(response);
+      console.log('handleShippingSubmit - Response status:', response.status);
+      console.log('handleShippingSubmit - Response data:', responseData);
+
+      if (!response.ok) {
+        const message = (responseData && (responseData.message || responseData.error)) || `Failed to update order status (HTTP ${response.status})`;
+        throw new Error(message);
+      }
+
+      // Update was successful - update the local order status optimistically
+      if (currentOrder) {
+        setCurrentOrder({
+          ...currentOrder,
+          OrderStatus: 'Shipped',
+        });
+      }
+
+      setNotification({ type: 'success', message: 'Order status updated to shipped successfully' });
+      setShowShippingModal(false);
+
+      // Try to refetch silently, but don't show error if it fails (status update already succeeded)
+      console.log('handleShippingSubmit - Attempting to refetch order data');
+      await fetchOrderById(Number(id), true);
+    } catch (err) {
+      console.error('handleShippingSubmit - Error:', err);
       setNotification({
         type: 'error',
         message: err instanceof Error ? err.message : 'Failed to update order status',
@@ -628,6 +712,71 @@ const OrderDetail = () => {
     <>
       <Header />
       {renderContent()}
+
+      {/* Shipping Modal */}
+      {showShippingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-black mb-6">Shipping Information</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-600 text-lg mb-2">Tracking Number *</label>
+                  <input
+                    type="text"
+                    value={shippingData.trackingNumber}
+                    onChange={(e) => setShippingData(prev => ({ ...prev, trackingNumber: e.target.value }))}
+                    placeholder="Enter tracking number"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent text-lg"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 text-lg mb-2">Tracking URL</label>
+                  <input
+                    type="url"
+                    value={shippingData.trackingUrl}
+                    onChange={(e) => setShippingData(prev => ({ ...prev, trackingUrl: e.target.value }))}
+                    placeholder="https://tracking.example.com/12345"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent text-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-600 text-lg mb-2">Delivery Partner *</label>
+                  <input
+                    type="text"
+                    value={shippingData.deliveryPartner}
+                    onChange={(e) => setShippingData(prev => ({ ...prev, deliveryPartner: e.target.value }))}
+                    placeholder="e.g., FedEx, DHL, India Post"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent text-lg"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-4 mt-8">
+                <button
+                  onClick={() => setShowShippingModal(false)}
+                  className="flex-1 px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors text-lg font-semibold"
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleShippingSubmit}
+                  className="flex-1 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isUpdating || !shippingData.trackingNumber.trim() || !shippingData.deliveryPartner.trim()}
+                >
+                  {isUpdating ? 'Updating...' : 'Ship Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
