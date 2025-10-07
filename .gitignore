@@ -7,7 +7,12 @@
 /build
 
 # cache (kills those webpack/client-development files)
-/.next/cache
+.next
+.next/cache
+
+# TypeScript build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # logs
 npm-debug.log*
