@@ -31,6 +31,9 @@ export interface Payment {
 
 export interface Shipment {
   ShippingStatus: string;
+  TrackingNumber?: string;
+  TrackingUrl?: string;
+  CourierName?: string;
 }
 
 export interface UserAddress {

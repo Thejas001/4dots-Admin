@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://fourdotsapp-prod.azurewebsites.net/api',
+  baseURL: 'https://fourdotsapp.azurewebsites.net/api',
   headers: {
     'Content-Type': 'application/json',
   },

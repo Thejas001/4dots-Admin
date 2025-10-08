@@ -18,7 +18,7 @@ const OrderDetail = () => {
   const [shippingData, setShippingData] = useState({
     trackingNumber: '',
     trackingUrl: '',
-    deliveryPartner: ''
+    courierName: ''
   });
 
   // Safely parse JSON responses that might be empty or non-JSON
@@ -72,7 +72,7 @@ const OrderDetail = () => {
         return;
       }
 
-      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${orderId}`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${orderId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -173,7 +173,7 @@ const OrderDetail = () => {
       setShippingData({
         trackingNumber: '',
         trackingUrl: '',
-        deliveryPartner: ''
+        courierName: ''
       });
       setShowShippingModal(true);
       return;
@@ -189,7 +189,7 @@ const OrderDetail = () => {
       const requestBody = { OrderStatus: newStatus };
 
       console.log('updateOrderStatus - Updating order', id, 'to status', newStatus);
-      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${id}/status`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -233,7 +233,7 @@ const OrderDetail = () => {
   };
 
   const handleShippingSubmit = async () => {
-    if (!id || !shippingData.trackingNumber.trim() || !shippingData.deliveryPartner.trim()) {
+    if (!id || !shippingData.trackingNumber.trim() || !shippingData.courierName.trim()) {
       setNotification({
         type: 'error',
         message: 'Please fill in all required fields (Tracking Number and Delivery Partner)'
@@ -252,11 +252,11 @@ const OrderDetail = () => {
         OrderStatus: 8, // Shipped
         TrackingNumber: shippingData.trackingNumber.trim(),
         TrackingUrl: shippingData.trackingUrl.trim(),
-        DeliveryPartner: shippingData.deliveryPartner.trim()
+        CourierName: shippingData.courierName.trim()
       };
 
       console.log('handleShippingSubmit - Updating order with shipping details:', requestBody);
-      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/${id}/status`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -309,7 +309,7 @@ const OrderDetail = () => {
       const token = localStorage.getItem('auth_token');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await fetch(`https://fourdotsapp-prod.azurewebsites.net/api/order/comment`, {
+      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/comment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -745,11 +745,11 @@ const OrderDetail = () => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-600 text-lg mb-2">Delivery Partner *</label>
+                  <label className="block text-gray-600 text-lg mb-2">Courier Name *</label>
                   <input
                     type="text"
-                    value={shippingData.deliveryPartner}
-                    onChange={(e) => setShippingData(prev => ({ ...prev, deliveryPartner: e.target.value }))}
+                    value={shippingData.courierName}
+                    onChange={(e) => setShippingData(prev => ({ ...prev, courierName: e.target.value }))}
                     placeholder="e.g., FedEx, DHL, India Post"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent text-lg"
                     required
@@ -768,7 +768,7 @@ const OrderDetail = () => {
                 <button
                   onClick={handleShippingSubmit}
                   className="flex-1 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isUpdating || !shippingData.trackingNumber.trim() || !shippingData.deliveryPartner.trim()}
+                  disabled={isUpdating || !shippingData.trackingNumber.trim() || !shippingData.courierName.trim()}
                 >
                   {isUpdating ? 'Updating...' : 'Ship Order'}
                 </button>
