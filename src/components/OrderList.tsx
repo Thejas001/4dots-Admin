@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useOrders } from '@/hooks/useOrders';
 import { Order } from '@/types/order';
-import Header from './Header';
 import { debounce } from 'lodash';
 
 const OrderList = () => {
@@ -130,33 +129,25 @@ const OrderList = () => {
 
   if (loading) {
     return (
-      <>
-        <Header />
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-gray-100">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
-        </div>
-      </>
+      <div className="flex items-center justify-center min-h-96">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <>
-        <Header />
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-gray-100">
-          <div className="text-center bg-white p-6 rounded-lg shadow-lg">
-            <p className="text-2xl font-bold text-red-600">Error Loading Orders</p>
-            <p className="text-gray-600 mt-2">{error}</p>
-          </div>
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center bg-white p-6 rounded-lg shadow-lg">
+          <p className="text-2xl font-bold text-red-600">Error Loading Orders</p>
+          <p className="text-gray-600 mt-2">{error}</p>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Header />
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gradient-to-b from-blue-50 to-gray-100 min-h-screen">
+    <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-6 sm:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
           My Orders
         </h1>
@@ -328,8 +319,7 @@ const OrderList = () => {
             Next
           </button>
         </div>
-      </div>
-    </>
+    </div>
   );
 };
 

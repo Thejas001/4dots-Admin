@@ -2,24 +2,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useOrders } from '@/hooks/useOrders';
 import { Order, Comment } from '@/types/order';
-import Header from '@/components/Header';
+import JSZip from 'jszip';
 
 const OrderDetail = () => {
-
   const router = useRouter();
   const { id } = router.query;
   const { orders, loading, error } = useOrders();
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [newComment, setNewComment] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showShippingModal, setShowShippingModal] = useState(false);
-  const [shippingData, setShippingData] = useState({
+  const [shippingData, setShippingData] = useState<{
+    trackingNumber: string;
+    trackingUrl: string;
+    courierName: string;
+  }>({
     trackingNumber: '',
     trackingUrl: '',
     courierName: ''
   });
+  const [newComment, setNewComment] = useState('');
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number; currentFile: string } | null>(null);
 
   // Safely parse JSON responses that might be empty or non-JSON
   const parseJsonIfPossible = async (response: Response): Promise<any | null> => {
@@ -341,6 +346,189 @@ const OrderDetail = () => {
     }
   };
 
+  const handleDownloadAllDocuments = async () => {
+    if (!currentOrder) return;
+
+    try {
+      const allDocuments = currentOrder.Items.flatMap(item => item.Documents || []);
+
+      if (allDocuments.length === 0) {
+        setNotification({ type: 'error', message: 'No documents found to download' });
+        return;
+      }
+
+      // Create a batch download page with all links
+      const batchDownloadPage = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Download All Documents - Order ${currentOrder.OrderId}</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                padding: 20px;
+                max-width: 800px;
+                margin: 0 auto;
+                background: #f5f5f5;
+              }
+              .header {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              }
+              .download-link {
+                display: block;
+                margin: 10px 0;
+                padding: 15px;
+                background: #007bff;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                transition: background 0.2s;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              }
+              .download-link:hover { background: #0056b3; }
+              .download-link.downloaded { background: #28a745; }
+              .download-link.failed { background: #dc3545; }
+              .progress { margin: 20px 0; font-weight: bold; }
+              .auto-download { margin: 20px 0; }
+              button {
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+              }
+              button:hover { background: #218838; }
+              button:disabled { background: #6c757d; cursor: not-allowed; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Download All Documents</h1>
+              <p>Order #${currentOrder.OrderId} - ${allDocuments.length} documents</p>
+            </div>
+
+            <div class="auto-download">
+              <button id="startAutoDownload">Start Auto Download All</button>
+              <p class="progress" id="progress">Ready to download</p>
+            </div>
+
+            <div id="links">
+              ${allDocuments.map((doc, index) =>
+                `<a href="${doc.DocumentUrl}" download="${doc.FileName}" class="download-link" data-index="${index}" target="_blank">
+                  📄 ${doc.FileName}
+                </a>`
+              ).join('')}
+            </div>
+
+            <script>
+              let isDownloading = false;
+              const links = document.querySelectorAll('.download-link');
+              const progressEl = document.getElementById('progress');
+              const startBtn = document.getElementById('startAutoDownload');
+
+              function updateProgress(message) {
+                progressEl.textContent = message;
+              }
+
+              function markDownloaded(index, success = true) {
+                const link = document.querySelector(\`[data-index="\${index}"]\`);
+                if (link) {
+                  link.className = 'download-link ' + (success ? 'downloaded' : 'failed');
+                  link.textContent = (success ? '✅ ' : '❌ ') + link.textContent.replace('📄 ', '');
+                }
+              }
+
+              async function downloadAll() {
+                if (isDownloading) return;
+                isDownloading = true;
+                startBtn.disabled = true;
+
+                updateProgress('Starting downloads...');
+
+                for (let i = 0; i < links.length; i++) {
+                  const link = links[i];
+                  updateProgress(\`Downloading \${i + 1} of \${links.length}: \${link.textContent.replace('📄 ', '')}\`);
+
+                  try {
+                    // Create a temporary link to trigger download
+                    const tempLink = document.createElement('a');
+                    tempLink.href = link.href;
+                    tempLink.download = link.download;
+                    tempLink.style.display = 'none';
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    document.body.removeChild(tempLink);
+
+                    markDownloaded(i, true);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                    markDownloaded(i, false);
+                  }
+
+                  // Wait longer between downloads to prevent browser overload
+                  if (i < links.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 2500)); // Increased to 2.5 seconds
+                  }
+                }
+
+                updateProgress(\`Completed! \${links.length} downloads triggered.\`);
+                startBtn.textContent = 'All Downloads Started';
+                startBtn.disabled = false;
+                isDownloading = false;
+
+                // Close window after all downloads complete (calculate based on number of files)
+                const closeDelay = Math.max(5000, links.length * 3000); // At least 5 seconds, or 3 seconds per file
+                setTimeout(() => {
+                  window.close();
+                }, closeDelay);
+              }
+
+              startBtn.addEventListener('click', downloadAll);
+
+              // Auto-start downloads after page loads
+              setTimeout(() => {
+                if (!isDownloading) {
+                  downloadAll();
+                }
+              }, 1000);
+            </script>
+          </body>
+        </html>
+      `;
+
+      // Open the batch download page
+      const downloadWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+
+      if (downloadWindow) {
+        downloadWindow.document.write(batchDownloadPage);
+        downloadWindow.document.close();
+
+        setNotification({
+          type: 'success',
+          message: `Download page opened with ${allDocuments.length} documents. Downloads will start automatically.`
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: 'Popup blocked! Please allow popups for this site and try again.'
+        });
+      }
+
+    } catch (error) {
+      console.error('Error creating batch download page:', error);
+      setNotification({
+        type: 'error',
+        message: 'Failed to create download page.'
+      });
+    }
+  };
+
   const statusOptions = [
     { value: 1, label: 'Pending' },
     { value: 3, label: 'PaymentSuccessful' },
@@ -549,7 +737,17 @@ const OrderDetail = () => {
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-8">
-              <h2 className="text-2xl font-bold text-black mb-6">Order Items</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-black">Order Items</h2>
+                {currentOrder.Items.some(item => item.Documents && item.Documents.length > 0) && (
+                  <button
+                    onClick={handleDownloadAllDocuments}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
+                  >
+                    Download All Documents
+                  </button>
+                )}
+              </div>
               <div className="space-y-6">
                 {currentOrder.Items.map((item, index) => (
                   <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
@@ -710,7 +908,6 @@ const OrderDetail = () => {
 
   return (
     <>
-      <Header />
       {renderContent()}
 
       {/* Shipping Modal */}
