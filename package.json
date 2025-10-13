@@ -15,7 +15,6 @@
   "description": "",
   "dependencies": {
     "@types/axios": "^0.9.36",
-    "@types/jszip": "^3.4.0",
     "axios": "^1.9.0",
     "jszip": "^3.10.1",
     "lodash": "^4.17.21",
@@ -25,6 +24,7 @@
     "react-hot-toast": "^2.5.2"
   },
   "devDependencies": {
+    "@types/jszip": "^3.4.0",
     "@types/lodash": "^4.17.20",
     "@types/node": "22.15.30",
     "@types/react": "^19.1.6",
