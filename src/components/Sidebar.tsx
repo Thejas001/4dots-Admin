@@ -37,12 +37,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
   // Close sidebar when route changes
   useEffect(() => {
     const handleRouteChange = () => {
-      onToggle();
+      if (isOpen) onToggle();
     };
 
     router.events.on('routeChangeStart', handleRouteChange);
     return () => router.events.off('routeChangeStart', handleRouteChange);
-  }, [router.events, onToggle]);
+  }, [router.events, onToggle, isOpen]);
 
   return (
     <>

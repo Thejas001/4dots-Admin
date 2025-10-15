@@ -638,22 +638,22 @@ const OrderDetail = () => {
     console.log('renderContent - Rendering order details for:', currentOrder);
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center text-black hover:text-gray-700 transition-colors text-lg"
+            className="flex items-center justify-center gap-2 text-black hover:text-gray-700 transition-colors text-base sm:text-lg w-full sm:w-auto"
           >
             <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Orders
           </button>
-          <h1 className="text-4xl font-bold text-black">Order #{currentOrder?.OrderId}</h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-black text-center sm:text-right w-full sm:w-auto">Order #{currentOrder?.OrderId}</h1>
         </div>
 
         {notification && (
           <div
-            className={`mb-8 p-4 rounded-lg text-lg ${
+            className={`mb-8 p-4 sm:p-5 rounded-lg text-base sm:text-lg ${
               notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}
           >
@@ -661,13 +661,13 @@ const OrderDetail = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-black">Order Status</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-black">Order Status</h2>
                 <select
-                  className={`px-6 py-3 rounded-lg text-lg font-semibold ${getStatusStyle(
+                  className={`w-full md:w-auto px-4 py-3 rounded-lg text-base sm:text-lg font-semibold ${getStatusStyle(
                     currentOrder?.OrderStatus || ''
                   )} border-0 focus:ring-2 focus:ring-black min-w-[200px]`}
                   value={statusOptions.find((option) => option.label === currentOrder?.OrderStatus)?.value || 1}
@@ -682,67 +682,67 @@ const OrderDetail = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <p className="text-gray-600 text-lg mb-2">Order Date</p>
-                  <p className="text-black text-xl font-semibold">{formatDate(currentOrder?.CreatedAt || '')}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-2">Order Date</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">{formatDate(currentOrder?.CreatedAt || '')}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-2">Total Amount</p>
-                  <p className="text-black text-xl font-semibold">₹{currentOrder?.TotalAmount}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-2">Total Amount</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">₹{currentOrder?.TotalAmount}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-2">Delivery Type</p>
-                  <p className="text-black text-xl font-semibold">{currentOrder?.DeliveryType || 'Not specified'}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-2">Delivery Type</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">{currentOrder?.DeliveryType || 'Not specified'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <h2 className="text-2xl font-bold text-black mb-6">Billing Address</h2>
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-black mb-6">Billing Address</h2>
               <div className="space-y-4">
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">Customer Name</p>
-                  <p className="text-black text-xl font-semibold">
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">Customer Name</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">
                     {currentOrder?.UserAddress?.Name || 'No name available'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">Address</p>
-                  <p className="text-black text-xl break-words whitespace-normal">
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">Address</p>
+                  <p className="text-black text-lg sm:text-xl break-words whitespace-normal">
                     {currentOrder?.UserAddress?.Address || 'No address available'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">City</p>
-                  <p className="text-black text-xl">{currentOrder?.UserAddress?.City || 'No city available'}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">City</p>
+                  <p className="text-black text-lg sm:text-xl">{currentOrder?.UserAddress?.City || 'No city available'}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="text-gray-600 text-lg mb-1">Pincode</p>
-                    <p className="text-black text-xl">{currentOrder?.UserAddress?.PinCode || 'No pincode available'}</p>
+                    <p className="text-gray-600 text-base sm:text-lg mb-1">Pincode</p>
+                    <p className="text-black text-lg sm:text-xl">{currentOrder?.UserAddress?.PinCode || 'No pincode available'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600 text-lg mb-1">Country</p>
-                    <p className="text-black text-xl">{currentOrder?.UserAddress?.Country || 'No country available'}</p>
+                    <p className="text-gray-600 text-base sm:text-lg mb-1">Country</p>
+                    <p className="text-black text-lg sm:text-xl">{currentOrder?.UserAddress?.Country || 'No country available'}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">Phone Number</p>
-                  <p className="text-black text-xl">
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">Phone Number</p>
+                  <p className="text-black text-lg sm:text-xl">
                     {currentOrder?.UserAddress?.PhoneNumber || 'No phone number available'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-black">Order Items</h2>
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-black">Order Items</h2>
                 {currentOrder.Items.some(item => item.Documents && item.Documents.length > 0) && (
                   <button
                     onClick={handleDownloadAllDocuments}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
+                    className="w-full sm:w-auto px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base sm:text-lg font-semibold"
                   >
                     Download All Documents
                   </button>
@@ -751,15 +751,15 @@ const OrderDetail = () => {
               <div className="space-y-6">
                 {currentOrder.Items.map((item, index) => (
                   <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-black mb-2">{item.ProductName}</h3>
-                        <p className="text-gray-600 text-lg">Quantity: {item.Quantity}</p>
-                        <p className="text-gray-600 text-lg">Price: ₹{item.Price}</p>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start mb-4">
+                      <div className="space-y-2">
+                        <h3 className="text-lg sm:text-xl font-bold text-black">{item.ProductName}</h3>
+                        <p className="text-gray-600 text-base sm:text-lg">Quantity: {item.Quantity}</p>
+                        <p className="text-gray-600 text-base sm:text-lg">Price: ₹{item.Price}</p>
                         {item.Attributes && item.Attributes.length > 0 && (
                           <div className="mt-2">
                             <p className="font-semibold text-black">Details:</p>
-                            <ul className="ml-4 list-disc text-gray-700">
+                            <ul className="ml-4 list-disc text-gray-700 text-sm sm:text-base">
                               {item.Attributes.map((attr: any) => (
                                 <li key={attr.OrderItemAttributeId || attr.AttributeName}>
                                   {attr.AttributeName}: {attr.AttributeValue}
@@ -792,27 +792,29 @@ const OrderDetail = () => {
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-black text-xl font-semibold">Total: ₹{item.Quantity * item.Price}</p>
+                      <div className="lg:text-right">
+                        <p className="text-black text-lg sm:text-xl font-semibold">Total: ₹{item.Quantity * item.Price}</p>
                       </div>
                     </div>
 
                     {item.Documents && item.Documents.length > 0 && (
                       <div className="mt-4">
-                        <h4 className="font-bold text-lg mb-3 text-black">Documents</h4>
+                        <h4 className="font-bold text-base sm:text-lg mb-3 text-black">Documents</h4>
                         <div className="space-y-3">
                           {item.Documents.map((doc, docIndex) => (
                             <div
                               key={docIndex}
-                              className="flex items-center justify-between bg-gray-50 p-4 rounded-lg"
+                              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50 p-4 rounded-lg"
                             >
                               <div className="flex items-center space-x-3">
-                                <span className="text-gray-800 text-lg">{doc.FileName}</span>
+                                <span className="text-gray-800 text-base sm:text-lg break-all">
+                                  {doc.FileName}
+                                </span>
                               </div>
                               <a
                                 href={doc.DocumentUrl}
                                 download={doc.FileName}
-                                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg"
+                                className="w-full sm:w-auto text-center px-5 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-base sm:text-lg"
                               >
                                 Download
                               </a>
@@ -826,26 +828,26 @@ const OrderDetail = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <h2 className="text-2xl font-bold text-black mb-6">Payment Information</h2>
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-black mb-6">Payment Information</h2>
               <div className="space-y-4">
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">Payment Method</p>
-                  <p className="text-black text-xl">{currentOrder.Payment?.PaymentMethod || 'Not specified'}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">Payment Method</p>
+                  <p className="text-black text-lg sm:text-xl">{currentOrder.Payment?.PaymentMethod || 'Not specified'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-lg mb-1">Payment Status</p>
-                  <p className="text-black text-xl">{currentOrder.Payment?.PaymentStatus || 'Not specified'}</p>
+                  <p className="text-gray-600 text-base sm:text-lg mb-1">Payment Status</p>
+                  <p className="text-black text-lg sm:text-xl">{currentOrder.Payment?.PaymentStatus || 'Not specified'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <h2 className="text-2xl font-bold text-black">Comments</h2>
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-black">Comments</h2>
               <div className="space-y-6">
                 {currentOrder.Comments?.map((comment, index) => (
                   <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                    <p className="text-black text-lg">{comment.Text ?? (comment as any)['CommentText']}</p>
+                    <p className="text-black text-base sm:text-lg">{comment.Text ?? (comment as any)['CommentText']}</p>
                   </div>
                 ))}
                 <div className="mt-6">
@@ -859,7 +861,7 @@ const OrderDetail = () => {
                   <button
                     onClick={handleAddComment}
                     disabled={isUpdating || !newComment.trim()}
-                    className="mt-4 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-4 w-full sm:w-auto px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUpdating ? 'Adding...' : 'Add Comment'}
                   </button>
@@ -868,34 +870,34 @@ const OrderDetail = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-md p-8">
-              <h2 className="text-2xl font-bold text-black mb-6">Order Summary</h2>
+          <div className="lg:col-span-1 space-y-6 lg:space-y-8">
+            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-black mb-6">Order Summary</h2>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-gray-600 text-lg">Subtotal</p>
-                  <p className="text-black text-xl font-semibold">₹{currentOrder?.TotalAmount}</p>
+                  <p className="text-gray-600 text-base sm:text-lg">Subtotal</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">₹{currentOrder?.TotalAmount}</p>
                 </div>
                 <div className="flex justify-between items-center">
-                  <p className="text-gray-600 text-lg">Shipping</p>
-                  <p className="text-black text-xl font-semibold">₹0.00</p>
+                  <p className="text-gray-600 text-base sm:text-lg">Shipping</p>
+                  <p className="text-black text-lg sm:text-xl font-semibold">₹0.00</p>
                 </div>
                 <div className="border-t border-gray-200 pt-4 mt-4">
                   <div className="flex justify-between items-center">
-                    <p className="text-black text-xl font-bold">Total</p>
-                    <p className="text-black text-2xl font-bold">₹{currentOrder?.TotalAmount}</p>
+                    <p className="text-black text-lg sm:text-xl font-bold">Total</p>
+                    <p className="text-black text-xl sm:text-2xl font-bold">₹{currentOrder?.TotalAmount}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {currentOrder?.Shipment && (
-              <div className="bg-white rounded-xl shadow-md p-8 mt-8">
-                <h2 className="text-2xl font-bold text-black mb-6">Order Information</h2>
+              <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
+                <h2 className="text-xl sm:text-2xl font-bold text-black mb-6">Order Information</h2>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-gray-600 text-lg mb-1">Order Status</p>
-                    <p className="text-black text-xl font-semibold">{currentOrder.OrderStatus}</p>
+                    <p className="text-gray-600 text-base sm:text-lg mb-1">Order Status</p>
+                    <p className="text-black text-lg sm:text-xl font-semibold">{currentOrder.OrderStatus}</p>
                   </div>
                 </div>
               </div>
