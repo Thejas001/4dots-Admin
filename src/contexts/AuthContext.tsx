@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import { AuthState, RegisterLoginRequest, VerifyOTPRequest, AuthResponse } from '@/types/auth';
+import { API_CONFIG } from '@/config/api';
 
 interface ErrorResponse {
   message: string;
@@ -52,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       console.log('Sending OTP request:', requestData);
-      const response = await axios.post('https://fourdotsapp.azurewebsites.net/api/account/register-or-login', requestData);
+      const response = await axios.post(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.REGISTER_LOGIN), requestData);
       
       setAuthState(prev => ({ ...prev, phoneNumber }));
       localStorage.setItem('phone_number', phoneNumber);
@@ -75,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Verifying OTP request:', requestData);
       const response = await axios.post<AuthResponse>(
-        'https://fourdotsapp.azurewebsites.net/api/account/verify-otp',
+        API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.VERIFY_OTP),
         requestData
       );
 

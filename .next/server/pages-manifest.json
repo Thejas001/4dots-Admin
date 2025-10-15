@@ -1,8 +1,12 @@
 {
   "/_app": "pages/_app.js",
+  "/api/site-settings": "pages/api/site-settings.js",
+  "/": "pages/index.html",
+  "/login": "pages/login.html",
+  "/manage-website": "pages/manage-website.html",
+  "/orders/[id]": "pages/orders/[id].html",
+  "/orders": "pages/orders.html",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/orders": "pages/orders.js",
-  "/manage-website": "pages/manage-website.js",
-  "/api/site-settings": "pages/api/site-settings.js"
+  "/404": "pages/404.html"
 }

@@ -5,7 +5,6 @@ import { SiteSettings } from '@/types/site';
 const mockSettings: SiteSettings = {
   codEnabled: true,
   maintenanceMode: false,
-  maxOrderAmount: 10000,
   contactEmail: 'admin@4dots.com',
   contactPhone: '+91 9876543210',
   siteTitle: '4dots Admin',

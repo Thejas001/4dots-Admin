@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SiteSettings, Banner } from '@/types/site';
+import { API_CONFIG } from '@/config/api';
 
 export const useSiteSettings = () => {
   const [settings, setSettings] = useState<SiteSettings>({
@@ -74,7 +75,7 @@ export const useSiteSettings = () => {
       const token = localStorage.getItem('auth_token');
       if (!token) return;
 
-      const response = await fetch('https://fourdotsapp.azurewebsites.net/api/cod/status', {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.COD_STATUS), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export const useSiteSettings = () => {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('https://fourdotsapp.azurewebsites.net/api/cod/toggle', {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.COD_TOGGLE), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
