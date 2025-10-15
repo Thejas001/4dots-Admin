@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * ATTENTION: An "eval-source-map" devtool has been used.
  * This devtool is neither made for production nor for readable output files.
@@ -187,3 +188,6 @@ var __webpack_exports__ = __webpack_require__.X(0, ["vendor-chunks/next","vendor
 module.exports = __webpack_exports__;
 
 })();
+=======
+"use strict";(()=>{var e={};e.id=636,e.ids=[636],e.modules={361:e=>{e.exports=require("next/dist/compiled/next-server/pages.runtime.prod.js")},1428:e=>{e.exports=import("axios")},2015:e=>{e.exports=require("react")},2326:e=>{e.exports=require("react-dom")},4075:e=>{e.exports=require("zlib")},7910:e=>{e.exports=require("stream")},8732:e=>{e.exports=require("react/jsx-runtime")},9021:e=>{e.exports=require("fs")}};var r=require("../webpack-runtime.js");r.C(e);var s=e=>r(r.s=e),t=r.X(0,[89,124,81],()=>s(2081));module.exports=t})();
+>>>>>>> efcde686bb9b020f31856372b62bdec6b225c53e

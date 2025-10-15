@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useOrders } from '@/hooks/useOrders';
 import { Order, Comment } from '@/types/order';
-import JSZip from 'jszip';
+import { API_CONFIG, DOWNLOAD_ORDERITEM_ZIP } from '@/config/api';
 
 const OrderDetail = () => {
   const router = useRouter();
@@ -23,8 +23,7 @@ const OrderDetail = () => {
     courierName: ''
   });
   const [newComment, setNewComment] = useState('');
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number; currentFile: string } | null>(null);
+  
 
   // Safely parse JSON responses that might be empty or non-JSON
   const parseJsonIfPossible = async (response: Response): Promise<any | null> => {
@@ -77,7 +76,7 @@ const OrderDetail = () => {
         return;
       }
 
-      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${orderId}`, {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.ORDER_DETAILS(orderId)), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -194,7 +193,7 @@ const OrderDetail = () => {
       const requestBody = { OrderStatus: newStatus };
 
       console.log('updateOrderStatus - Updating order', id, 'to status', newStatus);
-      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.ORDER_STATUS(String(id))), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -261,7 +260,7 @@ const OrderDetail = () => {
       };
 
       console.log('handleShippingSubmit - Updating order with shipping details:', requestBody);
-      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/${id}/status`, {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.ORDER_STATUS(String(id))), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -314,7 +313,7 @@ const OrderDetail = () => {
       const token = localStorage.getItem('auth_token');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await fetch(`https://fourdotsapp.azurewebsites.net/api/order/comment`, {
+      const response = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.ORDER_COMMENT), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -346,186 +345,39 @@ const OrderDetail = () => {
     }
   };
 
-  const handleDownloadAllDocuments = async () => {
-    if (!currentOrder) return;
-
+  const handleDownloadItemZip = async (orderItemId: number, fileBaseName: string) => {
     try {
-      const allDocuments = currentOrder.Items.flatMap(item => item.Documents || []);
-
-      if (allDocuments.length === 0) {
-        setNotification({ type: 'error', message: 'No documents found to download' });
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setNotification({ type: 'error', message: 'Authentication required. Please log in again.' });
         return;
       }
 
-      // Create a batch download page with all links
-      const batchDownloadPage = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Download All Documents - Order ${currentOrder.OrderId}</title>
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                padding: 20px;
-                max-width: 800px;
-                margin: 0 auto;
-                background: #f5f5f5;
-              }
-              .header {
-                background: white;
-                padding: 20px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              }
-              .download-link {
-                display: block;
-                margin: 10px 0;
-                padding: 15px;
-                background: #007bff;
-                color: white;
-                text-decoration: none;
-                border-radius: 6px;
-                transition: background 0.2s;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              }
-              .download-link:hover { background: #0056b3; }
-              .download-link.downloaded { background: #28a745; }
-              .download-link.failed { background: #dc3545; }
-              .progress { margin: 20px 0; font-weight: bold; }
-              .auto-download { margin: 20px 0; }
-              button {
-                background: #28a745;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-              }
-              button:hover { background: #218838; }
-              button:disabled { background: #6c757d; cursor: not-allowed; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Download All Documents</h1>
-              <p>Order #${currentOrder.OrderId} - ${allDocuments.length} documents</p>
-            </div>
+      const url = API_CONFIG.getFullUrl(DOWNLOAD_ORDERITEM_ZIP(orderItemId));
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-            <div class="auto-download">
-              <button id="startAutoDownload">Start Auto Download All</button>
-              <p class="progress" id="progress">Ready to download</p>
-            </div>
-
-            <div id="links">
-              ${allDocuments.map((doc, index) =>
-                `<a href="${doc.DocumentUrl}" download="${doc.FileName}" class="download-link" data-index="${index}" target="_blank">
-                  📄 ${doc.FileName}
-                </a>`
-              ).join('')}
-            </div>
-
-            <script>
-              let isDownloading = false;
-              const links = document.querySelectorAll('.download-link');
-              const progressEl = document.getElementById('progress');
-              const startBtn = document.getElementById('startAutoDownload');
-
-              function updateProgress(message) {
-                progressEl.textContent = message;
-              }
-
-              function markDownloaded(index, success = true) {
-                const link = document.querySelector(\`[data-index="\${index}"]\`);
-                if (link) {
-                  link.className = 'download-link ' + (success ? 'downloaded' : 'failed');
-                  link.textContent = (success ? '✅ ' : '❌ ') + link.textContent.replace('📄 ', '');
-                }
-              }
-
-              async function downloadAll() {
-                if (isDownloading) return;
-                isDownloading = true;
-                startBtn.disabled = true;
-
-                updateProgress('Starting downloads...');
-
-                for (let i = 0; i < links.length; i++) {
-                  const link = links[i];
-                  updateProgress(\`Downloading \${i + 1} of \${links.length}: \${link.textContent.replace('📄 ', '')}\`);
-
-                  try {
-                    // Create a temporary link to trigger download
-                    const tempLink = document.createElement('a');
-                    tempLink.href = link.href;
-                    tempLink.download = link.download;
-                    tempLink.style.display = 'none';
-                    document.body.appendChild(tempLink);
-                    tempLink.click();
-                    document.body.removeChild(tempLink);
-
-                    markDownloaded(i, true);
-                  } catch (error) {
-                    console.error('Download failed:', error);
-                    markDownloaded(i, false);
-                  }
-
-                  // Wait longer between downloads to prevent browser overload
-                  if (i < links.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 2500)); // Increased to 2.5 seconds
-                  }
-                }
-
-                updateProgress(\`Completed! \${links.length} downloads triggered.\`);
-                startBtn.textContent = 'All Downloads Started';
-                startBtn.disabled = false;
-                isDownloading = false;
-
-                // Close window after all downloads complete (calculate based on number of files)
-                const closeDelay = Math.max(5000, links.length * 3000); // At least 5 seconds, or 3 seconds per file
-                setTimeout(() => {
-                  window.close();
-                }, closeDelay);
-              }
-
-              startBtn.addEventListener('click', downloadAll);
-
-              // Auto-start downloads after page loads
-              setTimeout(() => {
-                if (!isDownloading) {
-                  downloadAll();
-                }
-              }, 1000);
-            </script>
-          </body>
-        </html>
-      `;
-
-      // Open the batch download page
-      const downloadWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-
-      if (downloadWindow) {
-        downloadWindow.document.write(batchDownloadPage);
-        downloadWindow.document.close();
-
-        setNotification({
-          type: 'success',
-          message: `Download page opened with ${allDocuments.length} documents. Downloads will start automatically.`
-        });
-      } else {
-        setNotification({
-          type: 'error',
-          message: 'Popup blocked! Please allow popups for this site and try again.'
-        });
+      if (!response.ok) {
+        throw new Error(`Failed to download (HTTP ${response.status} ${response.statusText}) for item #${orderItemId}`);
       }
 
-    } catch (error) {
-      console.error('Error creating batch download page:', error);
-      setNotification({
-        type: 'error',
-        message: 'Failed to create download page.'
-      });
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const safeName = (fileBaseName || 'documents').replace(/[^a-z0-9-_]+/gi, '_');
+      a.href = downloadUrl;
+      a.download = `${safeName}_${orderItemId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('handleDownloadItemZip - Error:', err);
+      setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to download ZIP' });
     }
   };
 
@@ -736,17 +588,9 @@ const OrderDetail = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-black">Order Items</h2>
-                {currentOrder.Items.some(item => item.Documents && item.Documents.length > 0) && (
-                  <button
-                    onClick={handleDownloadAllDocuments}
-                    className="w-full sm:w-auto px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base sm:text-lg font-semibold"
-                  >
-                    Download All Documents
-                  </button>
-                )}
+            <div className="bg-white rounded-xl shadow-md p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-black">Order Items</h2>
               </div>
               <div className="space-y-6">
                 {currentOrder.Items.map((item, index) => (
@@ -792,8 +636,14 @@ const OrderDetail = () => {
                           </div>
                         )}
                       </div>
-                      <div className="lg:text-right">
-                        <p className="text-black text-lg sm:text-xl font-semibold">Total: ₹{item.Quantity * item.Price}</p>
+                      <div className="text-right">
+                        <p className="text-black text-xl font-semibold">Total: ₹{item.Quantity * item.Price}</p>
+                        <button
+                          onClick={() => handleDownloadItemZip(item.OrderItemId, item.ProductName)}
+                          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base font-semibold cursor-pointer"
+                        >
+                          Download ZIP
+                        </button>
                       </div>
                     </div>
 
