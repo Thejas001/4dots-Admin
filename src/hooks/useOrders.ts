@@ -15,10 +15,10 @@ interface UseOrdersReturn {
     HasPreviousPage: boolean;
     HasNextPage: boolean;
   };
-  refetch: (pageNumber?: number, pageSize?: number) => Promise<void>;
+  refetch: (pageNumber?: number, pageSize?: number, status?: string) => Promise<void>;
 }
 
-export const useOrders = (pageNumber: number = 1, pageSize: number = 10): UseOrdersReturn => {
+export const useOrders = (pageNumber: number = 1, pageSize: number = 10, status?: string): UseOrdersReturn => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export const useOrders = (pageNumber: number = 1, pageSize: number = 10): UseOrd
   });
   const { isAuthenticated } = useAuth();
 
-  const fetchOrders = async (pageNum = pageNumber, pageSz = pageSize) => {
+  const fetchOrders = async (pageNum = pageNumber, pageSz = pageSize, statusFilter = status) => {
     if (!isAuthenticated) {
       setError('Authentication required');
       setLoading(false);
@@ -42,7 +42,11 @@ export const useOrders = (pageNumber: number = 1, pageSize: number = 10): UseOrd
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<OrderResponse>(`/order/orders?pageNumber=${pageNum}&pageSize=${pageSz}`);
+      let url = `/order/orders?pageNumber=${pageNum}&pageSize=${pageSz}`;
+      if (statusFilter && statusFilter !== 'all') {
+        url += `&status=${statusFilter}`;
+      }
+      const response = await api.get<OrderResponse>(url);
       if (response.data.Success) {
         setOrders(response.data.Data);
         setPagination({
@@ -65,10 +69,10 @@ export const useOrders = (pageNumber: number = 1, pageSize: number = 10): UseOrd
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchOrders();
+      fetchOrders(pageNumber, pageSize, status);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, pageNumber, pageSize]);
+  }, [isAuthenticated, pageNumber, pageSize, status]);
 
   return { orders, loading, error, pagination, refetch: fetchOrders };
 };
