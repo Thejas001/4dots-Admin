@@ -1,9 +1,13 @@
 {
   "/_app": "pages/_app.js",
+  "/api/site-settings": "pages/api/site-settings.js",
+  "/login": "pages/login.html",
+  "/": "pages/index.html",
+  "/insights": "pages/insights.html",
+  "/orders": "pages/orders.html",
+  "/manage-website": "pages/manage-website.html",
+  "/orders/[id]": "pages/orders/[id].html",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/orders": "pages/orders.js",
-  "/manage-website": "pages/manage-website.js",
-  "/api/site-settings": "pages/api/site-settings.js",
-  "/insights": "pages/insights.js"
+  "/404": "pages/404.html"
 }
