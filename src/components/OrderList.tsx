@@ -28,7 +28,7 @@ const OrderList = () => {
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewedOrders, setViewedOrders] = useState<Set<number>>(new Set());
-  const { orders, loading, error, pagination, refetch } = useOrders(pageNumber, 10);
+  const { orders, loading, error, pagination, refetch } = useOrders(pageNumber, 10, statusFilter !== 'all' ? statusFilter : undefined);
   const initFromQueryDoneRef = useRef(false);
 
   useEffect(() => {
@@ -39,10 +39,17 @@ const OrderList = () => {
   }, []);
 
   const debouncedRefetch = useRef(
-    debounce((page: number, pageSize: number) => {
-      refetch(page, pageSize);
+    debounce((page: number, pageSize: number, status: string) => {
+      refetch(page, pageSize, status !== 'all' ? status : undefined);
     }, 300)
-  ).current;
+  );
+
+  // Clear the debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedRefetch.current.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -66,8 +73,11 @@ const OrderList = () => {
       );
     }
 
-    debouncedRefetch(pageNumber, 10);
-  }, [router.isReady, pageNumber, router, debouncedRefetch]);
+    // Only refetch if we're not in the initial load
+    if (initFromQueryDoneRef.current) {
+      debouncedRefetch.current(pageNumber, 10, statusFilter);
+    }
+  }, [pageNumber, statusFilter, router]);
 
   useEffect(() => {
     console.log('OrderList - Current orders:', orders);
@@ -130,14 +140,9 @@ const OrderList = () => {
     return '';
   };
 
+  // Filter only by payment method since status is now handled by the API
   const filteredOrders = orders
-    .filter((order) => {
-      const matchesPayment = paymentFilter === 'all' || order.Payment?.PaymentMethod === paymentFilter;
-      const statusValue = getStatusValue(order.OrderStatus);
-      const matchesStatus =
-        statusFilter === 'all' || (statusValue !== undefined && String(statusValue) === statusFilter);
-      return matchesPayment && matchesStatus;
-    })
+    .filter((order) => paymentFilter === 'all' || order.Payment?.PaymentMethod === paymentFilter)
     .sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime());
 
   const isNewOrder = (orderId: number, dateString: string) => {
@@ -268,9 +273,6 @@ const OrderList = () => {
               <th className="px-4 sm:px-6 lg:px-10 py-4 text-left text-sm sm:text-base font-semibold text-gray-600 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-4 sm:px-6 lg:px-10 py-4 text-left text-sm sm:text-base font-semibold text-gray-600 uppercase tracking-wider">
-                Shipping
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -309,9 +311,6 @@ const OrderList = () => {
                     >
                       {statusLabel}
                     </span>
-                  </td>
-                  <td className="px-4 sm:px-6 lg:px-10 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600">
-                    {order.Shipment ? order.Shipment.ShippingStatus : '-'}
                   </td>
                 </tr>
               );
@@ -360,10 +359,6 @@ const OrderList = () => {
                   >
                     {statusLabel}
                   </span>
-                </div>
-                <div>
-                  <span className="font-semibold">Shipping:</span>{' '}
-                  {order.Shipment ? order.Shipment.ShippingStatus : '-'}
                 </div>
               </div>
             </div>
