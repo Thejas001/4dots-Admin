@@ -34,7 +34,7 @@ const AddCustomProduct: React.FC = () => {
     UserId: '',
     ProductName: '',
     Description: '',
-    BasePrice: 0,
+    BasePrice: '' as any,
     Quantity: 1,
     DocumentIds: []
   });
@@ -53,6 +53,7 @@ const AddCustomProduct: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   // Add user form state
   const [showAddUserForm, setShowAddUserForm] = useState(false);
@@ -72,7 +73,19 @@ const AddCustomProduct: React.FC = () => {
     try {
       let url = `/api/user/admin/list?pageNumber=${page}&pageSize=10`;
       if (search.trim()) {
-        url += `&search=${encodeURIComponent(search.trim())}`;
+        const searchValue = search.trim();
+        // Check if search is email (contains @) or phone number (digits with optional + at start)
+        const isEmail = searchValue.includes('@');
+        const isPhone = /^\+?\d+$/.test(searchValue);
+        
+        if (isEmail) {
+          url += `&email=${encodeURIComponent(searchValue)}`;
+        } else if (isPhone) {
+          url += `&phoneNumber=${encodeURIComponent(searchValue)}`;
+        } else {
+          // If neither, try email parameter (could be partial email)
+          url += `&email=${encodeURIComponent(searchValue)}`;
+        }
       }
       console.log('Fetching users from:', url);
   
@@ -107,6 +120,16 @@ const AddCustomProduct: React.FC = () => {
     } catch (error) {
       console.error('Failed to copy user ID:', error);
     }
+  };
+
+  // Select user and auto-fill user ID
+  const selectUser = (user: User) => {
+    setSelectedUser(user);
+    setFormData(prev => ({
+      ...prev,
+      UserId: user.Id
+    }));
+    toast.success(`Selected user: ${user.UserName}`);
   };
 
   // Create new user
@@ -468,89 +491,56 @@ const AddCustomProduct: React.FC = () => {
               ) : users.length > 0 ? (
                 <div className="space-y-4">
                   {users.map((user) => (
-                    <div key={user.Id} className="border border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
-                      <div className="space-y-3">
-                        {/* Header with avatar and status */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3 flex-1">
-                            <div className="flex-shrink-0">
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-2 border-white shadow-md">
-                                <span className="text-white font-bold text-lg">
-                                  {user.UserName.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
+                    <div 
+                      key={user.Id} 
+                      onClick={() => selectUser(user)}
+                      className={`border rounded-lg p-3 transition-all cursor-pointer ${
+                        selectedUser?.Id === user.Id
+                          ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
+                          : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        {/* Left side - Avatar and Info */}
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <div className="flex-shrink-0">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 shadow-sm ${
+                              selectedUser?.Id === user.Id
+                                ? 'bg-gradient-to-br from-blue-600 to-blue-400 border-blue-300'
+                                : 'bg-gradient-to-br from-gray-500 to-gray-400 border-gray-300'
+                            }`}>
+                              <span className="text-white font-bold text-sm">
+                                {user.UserName.charAt(0).toUpperCase()}
+                              </span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-base font-bold text-black truncate">
-                                {user.UserName}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Username
-                              </p>
-                            </div>
                           </div>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
-                            user.IsActive 
-                              ? 'bg-green-50 text-green-700 border-green-300' 
-                              : 'bg-gray-200 text-gray-700 border-gray-400'
-                          }`}>
-                            {user.IsActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-
-                        {/* User Details */}
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-xs text-gray-500 mb-0.5">First Name</p>
-                            <p className="text-black font-medium truncate">{user.FirstName || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-0.5">Last Name</p>
-                            <p className="text-black font-medium truncate">{user.LastName || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-0.5">Phone</p>
-                            <p className="text-black font-medium truncate">{user.PhoneNumber || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 mb-0.5">Email</p>
-                            <p className="text-black font-medium truncate" title={user.Email}>{user.Email || 'N/A'}</p>
-                          </div>
-                        </div>
-
-                        {/* User ID and Copy Button */}
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                          <div className="flex-1 min-w-0 mr-2">
-                            <p className="text-xs text-gray-500 mb-0.5">User ID</p>
-                            <p className="text-xs font-mono text-gray-700 truncate" title={user.Id}>
-                              {user.Id}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-black truncate">
+                              {user.FirstName || user.UserName} {user.LastName || ''}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {user.PhoneNumber || user.Email || 'No contact'}
                             </p>
                           </div>
-                          <button
-                            onClick={() => copyUserId(user.Id)}
-                            className={`flex items-center px-3 py-2 text-sm rounded-md transition-all ${
-                              copiedUserId === user.Id
-                                ? 'bg-green-600 text-white'
-                                : 'text-white bg-black hover:bg-gray-800'
-                            }`}
-                            title={copiedUserId === user.Id ? 'Copied!' : 'Copy User ID'}
-                          >
-                            {copiedUserId === user.Id ? (
-                              <>
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Copied!
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                Copy ID
-                              </>
-                            )}
-                          </button>
+                        </div>
+                        
+                        {/* Right side - Status */}
+                        <div className="flex-shrink-0">
+                          {selectedUser?.Id === user.Id ? (
+                            <div className="flex items-center text-blue-600">
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              user.IsActive 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {user.IsActive ? 'Active' : 'Inactive'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -749,23 +739,54 @@ const AddCustomProduct: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-200">
             <h2 className="text-2xl font-bold text-black mb-6">Add Custom Product</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* User ID Input */}
-              <div>
-                <label htmlFor="UserId" className="block text-sm font-medium text-black mb-2">
-                  User ID *
-                </label>
-                <input
-                  type="text"
-                  id="UserId"
-                  name="UserId"
-                  value={formData.UserId}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black transition-all"
-                  placeholder="Enter or paste user ID"
-                />
-                <p className="mt-1 text-sm text-gray-500">Copy user ID from the user list above</p>
-              </div>
+              {/* Selected User Display */}
+              {selectedUser ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-400 rounded-full flex items-center justify-center border-2 border-blue-300 shadow-sm">
+                        <span className="text-white font-bold">
+                          {selectedUser.UserName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Selected User</p>
+                        <p className="text-base font-bold text-black">
+                          {selectedUser.FirstName || selectedUser.UserName} {selectedUser.LastName || ''}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {selectedUser.PhoneNumber || selectedUser.Email}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedUser(null);
+                        setFormData(prev => ({ ...prev, UserId: '' }));
+                      }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Clear selection"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800">No user selected</p>
+                      <p className="text-xs text-yellow-700 mt-1">Please select a user from the list above to continue</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Product Name */}
               <div>
@@ -816,7 +837,7 @@ const AddCustomProduct: React.FC = () => {
                     required
                     min="0"
                     step="0.01"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     placeholder="0.00"
                   />
                 </div>
@@ -835,6 +856,24 @@ const AddCustomProduct: React.FC = () => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black transition-all"
                     placeholder="1"
                   />
+                </div>
+              </div>
+
+              {/* Total Price Display */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Price</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Quantity × Base Price</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-green-700">
+                      ₹{((Number(formData.BasePrice) || 0) * formData.Quantity).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {formData.Quantity} × ₹{(Number(formData.BasePrice) || 0).toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
 
