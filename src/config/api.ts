@@ -1,7 +1,7 @@
 // Global API Configuration
 export const API_CONFIG = {
   // Base URL for the API - change this to switch between environments
-  BASE_URL: 'https://fourdotsapp-prod.azurewebsites.net',
+  BASE_URL: 'https://fourdotsapp.azurewebsites.net',
 
   // API endpoints
   ENDPOINTS: {
@@ -19,6 +19,11 @@ export const API_CONFIG = {
     COD_STATUS: '/api/cod/status',
     COD_TOGGLE: '/api/cod/toggle',
     SITE_SETTINGS: '/api/site-settings',
+    
+    // Users
+    USER_LIST: '/api/user/admin/list',
+    USER_CREATE: '/api/user/admin/create-by-phone',
+    
     // Documents
     DOWNLOAD_ORDERITEM_ZIP: (orderItemId: string | number) => `/api/document/download-zip/${orderItemId}`,
   },
@@ -47,6 +52,8 @@ export const {
   COD_STATUS,
   COD_TOGGLE,
   SITE_SETTINGS,
+  USER_LIST,
+  USER_CREATE,
   DOWNLOAD_ORDERITEM_ZIP,
 } = API_CONFIG.ENDPOINTS;
 

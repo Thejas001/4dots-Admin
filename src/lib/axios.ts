@@ -2,13 +2,13 @@ import axios from 'axios';
 import { API_CONFIG } from '@/config/api';
 
 const api = axios.create({
-  baseURL: `${API_CONFIG.BASE_URL}/api`,
+  baseURL: API_CONFIG.BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add a request interceptor to add the token to all requests
+// Add token to all requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('auth_token');
@@ -18,17 +18,14 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add a response interceptor to handle token expiration
+// Handle 401 errors (token expired)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
       localStorage.removeItem('auth_token');
       localStorage.removeItem('phone_number');
       window.location.href = '/login';
@@ -37,4 +34,10 @@ api.interceptors.response.use(
   }
 );
 
-export default api; 
+// ✅ Add this helper function for typed responses
+export async function getTyped<T>(url: string): Promise<T> {
+  const response = await api.get<T>(url);
+  return response.data;
+}
+
+export default api;

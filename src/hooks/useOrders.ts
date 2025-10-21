@@ -42,7 +42,7 @@ export const useOrders = (pageNumber: number = 1, pageSize: number = 10, status?
     try {
       setLoading(true);
       setError(null);
-      let url = `/order/orders?pageNumber=${pageNum}&pageSize=${pageSz}`;
+      let url = `/api/order/orders?pageNumber=${pageNum}&pageSize=${pageSz}`;
       if (statusFilter && statusFilter !== 'all') {
         url += `&status=${statusFilter}`;
       }
