@@ -142,17 +142,57 @@ const AddCustomProduct: React.FC = () => {
       return;
     }
     
+    // Additional validation
+    if (!newUser.FirstName.trim()) {
+      toast.error('First name is required.');
+      return;
+    }
+    
+    if (!newUser.LastName.trim()) {
+      toast.error('Last name is required.');
+      return;
+    }
+    
     setIsCreatingUser(true);
     
     try {
-      await api.post(USER_CREATE, newUser);
+      console.log('Creating user with data:', newUser);
+      const response = await api.post(USER_CREATE, newUser);
+      console.log('User creation response:', response.data);
       toast.success('User created successfully!');
       closeUserForm();
       // Refresh the user list
       fetchUsers(userPage, searchQuery);
     } catch (error: any) {
       console.error('Error creating user:', error);
-      toast.error(`Failed to create user: ${error.response?.data?.message || error.message || 'Unknown error'}`);
+      console.error('Error response:', error.response?.data);
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to create user';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle the specific API response format: {"Success":false,"Errors":["User with this phone number already exists"]}
+        if (errorData.Errors && Array.isArray(errorData.Errors)) {
+          errorMessage = errorData.Errors.join(', ');
+        }
+        // Handle validation errors
+        else if (errorData.errors && typeof errorData.errors === 'object') {
+          const validationErrors = Object.values(errorData.errors).flat();
+          errorMessage = `Validation errors: ${validationErrors.join(', ')}`;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.Message) {
+          errorMessage = errorData.Message;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsCreatingUser(false);
     }
@@ -620,6 +660,7 @@ const AddCustomProduct: React.FC = () => {
                         value={newUser.PhoneNumber}
                         onChange={handleNewUserChange}
                         disabled={!!newUser.Email}
+                        pattern="^\+?[1-9]\d{1,14}$"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                         placeholder="+1234567890"
                       />
@@ -654,6 +695,7 @@ const AddCustomProduct: React.FC = () => {
                         value={newUser.FirstName}
                         onChange={handleNewUserChange}
                         required
+                        minLength={1}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="John"
                       />
@@ -683,6 +725,7 @@ const AddCustomProduct: React.FC = () => {
                         value={newUser.LastName}
                         onChange={handleNewUserChange}
                         required
+                        minLength={1}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="Doe"
                       />
