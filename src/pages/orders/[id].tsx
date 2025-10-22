@@ -597,9 +597,9 @@ const OrderDetail = () => {
                   <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
                     <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start mb-4">
                       <div className="space-y-2">
-                        <h3 className="text-lg sm:text-xl font-bold text-black">{item.ProductName}</h3>
+                        <h3 className="text-lg sm:text-xl font-bold text-black">{item.IsCustomProduct ? (item.CustomProductName || item.ProductName) : item.ProductName}</h3>
                         <p className="text-gray-600 text-base sm:text-lg">Quantity: {item.Quantity}</p>
-                        <p className="text-gray-600 text-base sm:text-lg">Price: ₹{item.Price}</p>
+                        <p className="text-gray-600 text-base sm:text-lg">Price: ₹{item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price) : item.Price}</p>
                         {item.Attributes && item.Attributes.length > 0 && (
                           <div className="mt-2">
                             <p className="font-semibold text-black">Details:</p>
@@ -637,9 +637,9 @@ const OrderDetail = () => {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-black text-xl font-semibold">Total: ₹{item.Quantity * item.Price}</p>
+                        <p className="text-black text-xl font-semibold">Total: ₹{item.Quantity * (item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price) : item.Price)}</p>
                         <button
-                          onClick={() => handleDownloadItemZip(item.OrderItemId, item.ProductName)}
+                          onClick={() => handleDownloadItemZip(item.OrderItemId, item.IsCustomProduct ? (item.CustomProductName || item.ProductName) : item.ProductName)}
                           className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-base font-semibold cursor-pointer"
                         >
                           Download ZIP

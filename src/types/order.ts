@@ -14,7 +14,7 @@ export interface Addon {
 export interface OrderItem {
   OrderItemId: number;
   OrderId: number;
-  ProductId: number;
+  ProductId: number | null;
   ProductName: string;
   Quantity: number;
   Price: number;
@@ -22,6 +22,10 @@ export interface OrderItem {
   Attributes: OrderAttribute[];
   DynamicAttributes: OrderAttribute[];
   Addons?: Addon[];
+  IsCustomProduct: boolean;
+  CustomProductName: string | null;
+  CustomDescription: string | null;
+  CustomBasePrice: number | null;
 }
 
 export interface Payment {
