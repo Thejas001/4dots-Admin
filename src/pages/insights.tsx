@@ -124,25 +124,48 @@ const InsightsPage = () => {
       setError(null);
       const params: Record<string, string> = {};
       
-      // For preset ranges, send the type
-      if (preset !== 'custom') {
-        params.type = preset;
-      }
+      let startDateParam: string | null = null;
+      let endDateParam: string | null = null;
       
-      // For custom range, send start and end dates
-      if (preset === 'custom') {
-        if (startDate) {
-          params.start = startDate;
+      if (preset !== 'custom') {
+        const today = new Date();
+        switch (preset) {
+          case 'today':
+            startDateParam = today.toISOString().split('T')[0];
+            endDateParam = startDateParam;
+            break;
+          case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            startDateParam = yesterday.toISOString().split('T')[0];
+            endDateParam = startDateParam;
+            break;
+          case 'last7days':
+            const end = today.toISOString().split('T')[0];
+            const start = new Date(today);
+            start.setDate(today.getDate() - 6);
+            startDateParam = start.toISOString().split('T')[0];
+            endDateParam = end;
+            break;
+          case 'last30days':
+            const end30 = today.toISOString().split('T')[0];
+            const start30 = new Date(today);
+            start30.setDate(today.getDate() - 29);
+            startDateParam = start30.toISOString().split('T')[0];
+            endDateParam = end30;
+            break;
         }
-        if (endDate) {
-          params.end = endDate;
-        }
+        params.start = startDateParam!;
+        params.end = endDateParam!;
+      } else {
+        if (startDate) params.start = startDate;
+        if (endDate) params.end = endDate;
       }
       
       console.log('API Request params:', params);
       console.log('Selected Metric:', selectedMetric);
 
-      const response = await api.get('/analytics/report', { params });
+      const response = await api.get('/api/analytics/report', { params });
       const payload = (response.data && typeof response.data === 'object' && 'Data' in response.data)
         ? (response.data as Record<string, unknown>).Data
         : response.data;
