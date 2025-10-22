@@ -156,8 +156,14 @@ const AddCustomProduct: React.FC = () => {
     setIsCreatingUser(true);
     
     try {
-      console.log('Creating user with data:', newUser);
-      const response = await api.post(USER_CREATE, newUser);
+      // Prepare user data with +91 prefix for phone number
+      const userData = {
+        ...newUser,
+        PhoneNumber: newUser.PhoneNumber ? `+91${newUser.PhoneNumber}` : newUser.PhoneNumber
+      };
+      
+      console.log('Creating user with data:', userData);
+      const response = await api.post(USER_CREATE, userData);
       console.log('User creation response:', response.data);
       toast.success('User created successfully!');
       closeUserForm();
@@ -673,19 +679,24 @@ const AddCustomProduct: React.FC = () => {
                       <label htmlFor="PhoneNumber" className="block text-sm font-medium text-black mb-1">
                         Phone Number
                       </label>
-                      <input
-                        type="tel"
-                        id="PhoneNumber"
-                        name="PhoneNumber"
-                        value={newUser.PhoneNumber}
-                        onChange={handleNewUserChange}
-                        disabled={!!newUser.Email}
-                        pattern="^\+?[1-9]\d{1,14}$"
-                        autoComplete="new-password"
-                        data-form-type="other"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        placeholder="+1234567890"
-                      />
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500 text-sm">+91</span>
+                        </div>
+                        <input
+                          type="tel"
+                          id="PhoneNumber"
+                          name="PhoneNumber"
+                          value={newUser.PhoneNumber}
+                          onChange={handleNewUserChange}
+                          disabled={!!newUser.Email}
+                          pattern="^[6-9]\d{9}$"
+                          autoComplete="new-password"
+                          data-form-type="other"
+                          className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          placeholder="9876543210"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label htmlFor="Email" className="block text-sm font-medium text-black mb-1">
