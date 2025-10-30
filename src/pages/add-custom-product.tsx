@@ -156,8 +156,14 @@ const AddCustomProduct: React.FC = () => {
     setIsCreatingUser(true);
     
     try {
-      console.log('Creating user with data:', newUser);
-      const response = await api.post(USER_CREATE, newUser);
+      // Prepare user data with +91 prefix for phone number
+      const userData = {
+        ...newUser,
+        PhoneNumber: newUser.PhoneNumber ? `+91${newUser.PhoneNumber}` : newUser.PhoneNumber
+      };
+      
+      console.log('Creating user with data:', userData);
+      const response = await api.post(USER_CREATE, userData);
       console.log('User creation response:', response.data);
       toast.success('User created successfully!');
       closeUserForm();
@@ -383,11 +389,25 @@ const AddCustomProduct: React.FC = () => {
       // Send to API endpoint
       await api.post('/api/cart/add-custom', requestBody);
       
-      // Show success message and redirect
+      // Show success message and reset form
       toast.success('Custom product added to user cart successfully!');
-      setTimeout(() => {
-        router.push('/orders');
-      }, 1000);
+      
+      // Scroll to top of page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Reset form data
+      setFormData({
+        UserId: '',
+        ProductName: '',
+        Description: '',
+        BasePrice: '' as any,
+        Quantity: 1,
+        DocumentIds: []
+      });
+      setUploadedFiles([]);
+      setUploadPreviews([]);
+      setDocumentUrls([]);
+      setSelectedUser(null);
     } catch (error: any) {
       console.error('Error adding custom product:', error);
       toast.error(`Error adding custom product: ${error.response?.data?.message || error.message || 'Please try again'}`);
@@ -488,7 +508,7 @@ const AddCustomProduct: React.FC = () => {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by name, phone, or email..."
+                      placeholder="Search by phone, or email..."
                       className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black"
                     />
                     <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -647,23 +667,36 @@ const AddCustomProduct: React.FC = () => {
                   </button>
                 </div>
                 <div className="p-6">
-                <form onSubmit={createUser} className="space-y-4">
+                <form onSubmit={createUser} className="space-y-4" autoComplete="new-password">
+                  {/* Hidden dummy fields to trick Chrome autofill */}
+                  <div style={{ display: 'none' }}>
+                    <input type="text" name="fake-username" autoComplete="username" />
+                    <input type="password" name="fake-password" autoComplete="current-password" />
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="PhoneNumber" className="block text-sm font-medium text-black mb-1">
                         Phone Number
                       </label>
-                      <input
-                        type="tel"
-                        id="PhoneNumber"
-                        name="PhoneNumber"
-                        value={newUser.PhoneNumber}
-                        onChange={handleNewUserChange}
-                        disabled={!!newUser.Email}
-                        pattern="^\+?[1-9]\d{1,14}$"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        placeholder="+1234567890"
-                      />
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500 text-sm">+91</span>
+                        </div>
+                        <input
+                          type="tel"
+                          id="PhoneNumber"
+                          name="PhoneNumber"
+                          value={newUser.PhoneNumber}
+                          onChange={handleNewUserChange}
+                          disabled={!!newUser.Email}
+                          pattern="^[6-9]\d{9}$"
+                          autoComplete="new-password"
+                          data-form-type="other"
+                          className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          placeholder="9876543210"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label htmlFor="Email" className="block text-sm font-medium text-black mb-1">
@@ -676,6 +709,8 @@ const AddCustomProduct: React.FC = () => {
                         value={newUser.Email}
                         onChange={handleNewUserChange}
                         disabled={!!newUser.PhoneNumber}
+                        autoComplete="new-password"
+                        data-form-type="other"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                         placeholder="user@example.com"
                       />
@@ -696,6 +731,8 @@ const AddCustomProduct: React.FC = () => {
                         onChange={handleNewUserChange}
                         required
                         minLength={1}
+                        autoComplete="new-password"
+                        data-form-type="other"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="John"
                       />
@@ -710,6 +747,8 @@ const AddCustomProduct: React.FC = () => {
                         name="MiddleName"
                         value={newUser.MiddleName}
                         onChange={handleNewUserChange}
+                        autoComplete="new-password"
+                        data-form-type="other"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="Michael"
                       />
@@ -726,6 +765,8 @@ const AddCustomProduct: React.FC = () => {
                         onChange={handleNewUserChange}
                         required
                         minLength={1}
+                        autoComplete="new-password"
+                        data-form-type="other"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="Doe"
                       />
