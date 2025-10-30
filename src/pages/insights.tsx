@@ -147,10 +147,8 @@ const InsightsPage = () => {
       setLoading(true);
       setError(null);
       const params: Record<string, string> = {};
-      
       let startDateParam: string | null = null;
       let endDateParam: string | null = null;
-      
       if (preset !== 'custom') {
         const today = new Date();
         switch (preset) {
@@ -185,54 +183,56 @@ const InsightsPage = () => {
         if (startDate) params.start = startDate;
         if (endDate) params.end = endDate;
       }
-      
-      console.log('API Request params:', params);
-      console.log('Selected Metric:', selectedMetric);
 
-      const response = await api.get('/api/analytics/product-sales-report', {
-        params: {
-          type: preset,
-          start: params.start,
-          end: params.end
-        }
-      });
-      const payload = (response.data && typeof response.data === 'object' && 'Data' in response.data)
-        ? (response.data as Record<string, unknown>).Data
-        : response.data;
+      const sharedParams = {
+        type: preset,
+        start: params.start,
+        end: params.end
+      };
 
-      console.log('API Response:', response.data);
-      console.log('Payload:', payload);
-      console.log('Details array:', (payload as InsightsData)?.Details);
-      
-      // Transform API data to match old insights expectations
-      const { Details = [], TotalProductsSold = 0, TotalRevenue = 0 } = (payload as any) || {};
-      const productMap = new Map<string, { name: string; count: number; totalAmount: number }>();
-      for (const day of Details as any[]) {
-        if (Array.isArray((day as any).Products)) {
-          for (const p of (day as any).Products as any[]) {
-            if (!productMap.has(p.ProductName)) {
-              productMap.set(p.ProductName, {
-                name: p.ProductName,
-                count: 0,
-                totalAmount: 0
-              });
+      if (selectedMetric === 'bestSelling') {
+        // Log params for debugging
+        console.log('Best seller API params:', sharedParams);
+        // Fetch product-sales-report for best sellers only, use calculated sharedParams
+        const response = await api.get('/api/analytics/product-sales-report', { params: sharedParams });
+        const payload = (response.data && typeof response.data === 'object' && 'Data' in response.data)
+          ? (response.data as Record<string, unknown>).Data
+          : response.data;
+
+        const { Details = [], TotalProductsSold = 0, TotalRevenue = 0 } = (payload as any) || {};
+        const productMap = new Map<string, { name: string; count: number; totalAmount: number }>();
+        for (const day of Details as any[]) {
+          if (Array.isArray((day as any).Products)) {
+            for (const p of (day as any).Products as any[]) {
+              if (!productMap.has(p.ProductName)) {
+                productMap.set(p.ProductName, {
+                  name: p.ProductName,
+                  count: 0,
+                  totalAmount: 0
+                });
+              }
+              const entry = productMap.get(p.ProductName)!;
+              entry.count += p.QuantitySold || 0;
+              entry.totalAmount += p.Revenue || 0;
             }
-            const entry = productMap.get(p.ProductName)!;
-            entry.count += p.QuantitySold || 0;
-            entry.totalAmount += p.Revenue || 0;
           }
         }
+        const BestSellingItems = Array.from(productMap.values());
+        setData({
+          OrdersCount: 0, // not available in new API
+          FailedPaymentsCount: 0,
+          NewUsersCount: 0,
+          TotalAmount: TotalRevenue,
+          Details: Details as any,
+          BestSellingItems
+        });
+      } else {
+        const response = await api.get('/api/analytics/report', { params: sharedParams });
+        const payload = (response.data && typeof response.data === 'object' && 'Data' in response.data)
+          ? (response.data as Record<string, unknown>).Data
+          : response.data;
+        setData(payload as InsightsData);
       }
-      const BestSellingItems = Array.from(productMap.values());
-
-      setData({
-        OrdersCount: 0, // not available in new API, set as needed
-        FailedPaymentsCount: 0, // set as needed
-        NewUsersCount: 0, // set as needed
-        TotalAmount: TotalRevenue,
-        Details: Details as any,
-        BestSellingItems
-      });
     } catch (err) {
       setError('Unable to load insights data');
       setData(null);
