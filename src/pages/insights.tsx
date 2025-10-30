@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
 
 type PresetRange = 'last7days' | 'last30days' | 'today' | 'yesterday' | 'custom';
-type MetricType = 'orders' | 'newUsers' | 'totalAmount';
+type MetricType = 'orders' | 'newUsers' | 'totalAmount' | 'bestSelling';
+
+interface BestSellingItem {
+  name: string;
+  value: number;
+  count: number;
+}
 
 interface DailyDetail {
   Date: string;
@@ -20,6 +26,11 @@ interface InsightsData {
   NewUsersCount: number;
   TotalAmount: number;
   Details: DailyDetail[];
+  BestSellingItems?: Array<{
+    name: string;
+    count: number;
+    totalAmount: number;
+  }>;
 }
 
 const numberFormatter = new Intl.NumberFormat('en-IN');
@@ -60,6 +71,7 @@ const InsightsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('orders');
+  const [topSellersSort, setTopSellersSort] = useState<'amount' | 'count'>('amount');
 
   const activeType = useMemo(() => {
     if (preset === 'custom') {
@@ -109,11 +121,23 @@ const InsightsPage = () => {
     return Math.max(...positiveValues);
   }, [dailyChartData]);
 
+  const bestSellingData = useMemo(() => {
+    if (data?.BestSellingItems?.length) {
+      return data.BestSellingItems.map(item => ({
+        name: item.name,
+        value: item.totalAmount,
+        count: item.count
+      }));
+    }
+    return [];
+  }, [data]);
+
   const metricConfig = useMemo(() => {
     const configs = {
       orders: { label: 'Orders Count', color: 'from-blue-600 to-indigo-500', value: data?.OrdersCount || 0 },
       newUsers: { label: 'New Users', color: 'from-green-600 to-emerald-500', value: data?.NewUsersCount || 0 },
-      totalAmount: { label: 'Total Amount', color: 'from-purple-600 to-pink-500', value: data?.TotalAmount || 0 }
+      totalAmount: { label: 'Total Amount', color: 'from-purple-600 to-pink-500', value: data?.TotalAmount || 0 },
+      bestSelling: { label: 'Best Selling Items', color: 'from-amber-500 to-orange-500', value: data?.BestSellingItems?.length || 0 }
     };
     return configs[selectedMetric];
   }, [selectedMetric, data]);
@@ -165,7 +189,13 @@ const InsightsPage = () => {
       console.log('API Request params:', params);
       console.log('Selected Metric:', selectedMetric);
 
-      const response = await api.get('/api/analytics/report', { params });
+      const response = await api.get('/api/analytics/product-sales-report', {
+        params: {
+          type: preset,
+          start: params.start,
+          end: params.end
+        }
+      });
       const payload = (response.data && typeof response.data === 'object' && 'Data' in response.data)
         ? (response.data as Record<string, unknown>).Data
         : response.data;
@@ -174,7 +204,35 @@ const InsightsPage = () => {
       console.log('Payload:', payload);
       console.log('Details array:', (payload as InsightsData)?.Details);
       
-      setData(payload as InsightsData);
+      // Transform API data to match old insights expectations
+      const { Details = [], TotalProductsSold = 0, TotalRevenue = 0 } = (payload as any) || {};
+      const productMap = new Map<string, { name: string; count: number; totalAmount: number }>();
+      for (const day of Details as any[]) {
+        if (Array.isArray((day as any).Products)) {
+          for (const p of (day as any).Products as any[]) {
+            if (!productMap.has(p.ProductName)) {
+              productMap.set(p.ProductName, {
+                name: p.ProductName,
+                count: 0,
+                totalAmount: 0
+              });
+            }
+            const entry = productMap.get(p.ProductName)!;
+            entry.count += p.QuantitySold || 0;
+            entry.totalAmount += p.Revenue || 0;
+          }
+        }
+      }
+      const BestSellingItems = Array.from(productMap.values());
+
+      setData({
+        OrdersCount: 0, // not available in new API, set as needed
+        FailedPaymentsCount: 0, // set as needed
+        NewUsersCount: 0, // set as needed
+        TotalAmount: TotalRevenue,
+        Details: Details as any,
+        BestSellingItems
+      });
     } catch (err) {
       setError('Unable to load insights data');
       setData(null);
@@ -326,6 +384,16 @@ const InsightsPage = () => {
                   >
                     💰 Amount
                   </button>
+                  <button
+                    onClick={() => setSelectedMetric('bestSelling')}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                      selectedMetric === 'bestSelling'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg scale-105'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    🏆 Best Sellers
+                  </button>
                 </div>
               </div>
             </div>
@@ -351,11 +419,144 @@ const InsightsPage = () => {
             {/* Chart Section */}
             <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
               <div className="mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Daily Trends - {metricConfig.label}</h2>
-                <p className="text-sm text-gray-500 mt-1">View daily breakdown for the selected period</p>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {selectedMetric === 'bestSelling' ? 'Best Selling Items' : `Daily Trends - ${metricConfig.label}`}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedMetric === 'bestSelling' 
+                    ? 'Top performing products by sales amount' 
+                    : 'View daily breakdown for the selected period'}
+                </p>
               </div>
 
-              {data && dailyChartData.length > 0 ? (
+              {selectedMetric === 'bestSelling' ? (
+                <div className="w-full" style={{ height: '600px' }}>
+                  {bestSellingData.length > 0 ? (
+                    <div className="flex flex-col md:flex-row h-full gap-6">
+                      <div className="w-full md:w-2/3 h-96 md:h-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <defs>
+                              {bestSellingData.map((entry, index) => (
+                                <linearGradient 
+                                  key={`gradient-${index}`} 
+                                  id={`gradient-${index}`} 
+                                  x1="0" 
+                                  y1="0" 
+                                  x2="0" 
+                                  y2="1"
+                                >
+                                  <stop offset="0%" stopColor={`hsl(${index * 360 / bestSellingData.length}, 70%, 60%)`} />
+                                  <stop offset="100%" stopColor={`hsl(${index * 360 / bestSellingData.length}, 90%, 40%)`} />
+                                </linearGradient>
+                              ))}
+                            </defs>
+                            <Pie
+                              data={bestSellingData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={140}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }: any) => {
+                                return `${name}\n${((percent || 0) * 100).toFixed(0)}%`;
+                              }}
+                              labelLine={false}
+                            >
+                              {bestSellingData.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`}
+                                  fill={`url(#gradient-${index})`}
+                                  stroke="#fff"
+                                  strokeWidth={2}
+                                  style={{
+                                    filter: 'drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.2))',
+                                    transition: 'opacity 0.3s',
+                                    cursor: 'pointer'
+                                  }}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              content={({ active, payload }) => {
+                                if (!active || !payload || !payload.length) return null;
+                                const p = payload[0].payload as { name: string; value: number; count: number };
+                                return (
+                                  <div style={{
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }}>
+                                    <div style={{ fontWeight: 600 }}>{p.name}</div>
+                                    <div style={{ color: '#4b5563' }}>₹{numberFormatter.format(p.value)}</div>
+                                    <div style={{ color: '#6b7280', fontSize: '12px' }}>{p.count} items sold</div>
+                                  </div>
+                                );
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="w-full md:w-1/3 space-y-4">
+                        {/* Filter for sorting top sellers */}
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-gray-800">Top Sellers</h3>
+                          <select
+                            className="border rounded outline-none px-2 py-1 text-sm"
+                            value={topSellersSort}
+                            onChange={e => setTopSellersSort(e.target.value as 'amount' | 'count')}
+                          >
+                            <option value="amount">By Amount</option>
+                            <option value="count">By Count</option>
+                          </select>
+                        </div>
+                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                          <div className="space-y-3">
+                            {bestSellingData
+                              .slice() // copy so sort doesn't mutate original
+                              .sort((a, b) => topSellersSort === 'amount' ? b.value - a.value : b.count - a.count)
+                              .map((item, index) => (
+                                <div key={index} className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    <div 
+                                      className="w-3 h-3 rounded-full" 
+                                      style={{ 
+                                        background: `hsl(${index * 360 / bestSellingData.length}, 70%, 60%)`,
+                                        boxShadow: '0 0 0 3px rgba(255,255,255,0.8), 0 2px 5px rgba(0,0,0,0.1)'
+                                      }}
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">{item.name}</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-gray-900 flex flex-col items-end gap-0.5">
+                                    <span>₹{numberFormatter.format(item.value)}</span>
+                                    <span className="text-xs text-gray-500">{item.count} sold</span>
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                          <h4 className="font-medium text-blue-800 mb-2">Total Sales</h4>
+                          <div className="text-2xl font-bold text-blue-900">
+                            ₹{numberFormatter.format(bestSellingData.reduce((sum, item) => sum + item.value, 0))}
+                          </div>
+                          <div className="text-sm text-blue-600 mt-1">
+                            {bestSellingData.reduce((sum, item) => sum + item.count, 0)} items sold
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No best selling items data available
+                    </div>
+                  )}
+                </div>
+              ) : data && dailyChartData.length > 0 ? (
                 <div className="mt-8">
                   {/* Professional Recharts Bar Chart */}
                   <div className="w-full" style={{ height: '450px' }}>
