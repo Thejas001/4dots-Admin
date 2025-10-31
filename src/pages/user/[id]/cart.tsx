@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, Fragment } from 'react';
 import api from '@/lib/axios';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -430,19 +430,121 @@ const UserCartPage = () => {
                                 </p>
                               </div>
 
-                              {/* Attributes */}
-                              {item.Attributes.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 mb-3">
-                                  {item.Attributes.map((attr, i) => (
-                                    <span
-                                      key={i}
-                                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700"
-                                    >
-                                      {attr.AttributeName}: {attr.AttributeValue}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                              {/* Print Specifications */}
+                              <div className="space-y-2 mb-3">
+                                {/* Basic Attributes */}
+                                {item.Attributes.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {item.Attributes.map((attr, i) => (
+                                      <span
+                                        key={`attr-${i}`}
+                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-teal-50 text-teal-700"
+                                      >
+                                        {attr.AttributeName}: {attr.AttributeValue}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Print Details */}
+                                {item.DynamicAttributes.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <h5 className="text-xs font-semibold text-gray-500 mb-1">PRINT DETAILS</h5>
+                                    <div className="grid grid-cols-2 gap-1.5 text-sm">
+                                      {item.DynamicAttributes.map((attr, i) => {
+                                        // Skip if attribute is empty
+                                        if (!attr.AttributeValue) return null;
+                                        
+                                        // Format label for display
+                                        const formatLabel = (label: string) => {
+                                          return label
+                                            .replace(/([A-Z])/g, ' $1')
+                                            .replace(/^./, str => str.toUpperCase())
+                                            .trim();
+                                        };
+
+                                        // Special handling for color print range
+                                        if (attr.AttributeName === 'ColorPrintRange') {
+                                          const pageCount = item.DynamicAttributes.find(a => a.AttributeName === 'PageCount')?.AttributeValue;
+                                          const colorPageCount = item.DynamicAttributes.find(a => a.AttributeName === 'TotalColorPageCount')?.AttributeValue;
+                                          
+                                          return (
+                                            <Fragment key={`dyn-${i}`}>
+                                              <div className="font-medium text-gray-700">Color Pages:</div>
+                                              <div className="text-gray-900">
+                                                {colorPageCount} pages ({attr.AttributeValue})
+                                              </div>
+                                              {pageCount && (
+                                                <Fragment>
+                                                  <div className="font-medium text-gray-700">Black & White Pages:</div>
+                                                  <div className="text-gray-900">
+                                                    {parseInt(pageCount) - (parseInt(colorPageCount || '0') || 0)} pages
+                                                  </div>
+                                                </Fragment>
+                                              )}
+                                            </Fragment>
+                                          );
+                                        }
+
+                                        // Skip these as they're handled above
+                                        if (['PageCount', 'TotalColorPageCount'].includes(attr.AttributeName)) {
+                                          return null;
+                                        }
+
+                                        // Handle NumberOfCopies specially
+                                        if (attr.AttributeName === 'NumberOfCopies') {
+                                          return (
+                                            <Fragment key={`dyn-${i}`}>
+                                              <div className="font-medium text-gray-700">Copies:</div>
+                                              <div className="text-gray-900">{attr.AttributeValue}</div>
+                                            </Fragment>
+                                          );
+                                        }
+
+                                        // Handle ProductComment specially
+                                        if (attr.AttributeName === 'ProductComment') {
+                                          return (
+                                            <div key={`dyn-${i}`} className="col-span-2 mt-2 pt-2 border-t border-gray-100">
+                                              <div className="text-xs font-medium text-gray-500 mb-1">CUSTOMER NOTE</div>
+                                              <p className="text-sm text-gray-700 bg-amber-50 p-2 rounded-md">
+                                                {attr.AttributeValue}
+                                              </p>
+                                            </div>
+                                          );
+                                        }
+
+                                        // Default rendering for other attributes
+                                        return (
+                                          <Fragment key={`dyn-${i}`}>
+                                            <div className="font-medium text-gray-700">
+                                              {formatLabel(attr.AttributeName)}:
+                                            </div>
+                                            <div className="text-gray-900">
+                                              {attr.AttributeValue}
+                                            </div>
+                                          </Fragment>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Addons */}
+                                {item.Addons?.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <h5 className="text-xs font-semibold text-gray-500 mb-1">ADD-ONS</h5>
+                                    <ul className="space-y-1">
+                                      {item.Addons.map((addon: any, i: number) => (
+                                        <li key={`addon-${i}`} className="text-sm text-gray-700">
+                                          {addon.NumberOfBooks > 1 ? `${addon.NumberOfBooks}x ` : ''}
+                                          {addon.AddonName || `Addon #${i + 1}`}
+                                          {addon.AddonPrice ? ` (₹${addon.AddonPrice.toFixed(2)} each)` : ''}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
 
                               {/* Quantity + Remove */}
                               <div className="flex items-center justify-between mt-3">
