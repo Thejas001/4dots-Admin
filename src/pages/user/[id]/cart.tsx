@@ -555,9 +555,7 @@ const UserCartPage = () => {
 
                                 <div className="flex items-center gap-3">
                                   <p className="text-sm font-medium text-gray-600">
-                                    <span className="font-bold text-gray-900">
-                                      ₹{(item.ItemPrice * item.Quantity).toFixed(2)}
-                                    </span>
+
                                   </p>
                                   <button
                                     onClick={() => confirmRemove(item.CartItemId, item.ProductName)}
