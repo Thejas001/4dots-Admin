@@ -33,6 +33,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       ),
     },
     {
+      name: 'User Carts',
+      href: '/user-carts',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4" />
+          <circle cx="7" cy="21" r="1" />
+          <circle cx="17" cy="21" r="1" />
+        </svg>
+      ),
+    },
+    {
       name: 'Add Custom Product',
       href: '/add-custom-product',
       icon: (

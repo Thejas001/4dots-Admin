@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle, X, ShoppingCart, Plus } from 'lucide-react';
 import { USER_LIST, USER_CREATE } from '@/config/api';
 import { User, CreateUserRequest } from '@/types/user';
 
@@ -43,6 +45,8 @@ const AddCustomProduct: React.FC = () => {
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
   const [documentUrls, setDocumentUrls] = useState<string[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<boolean>(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [addedCartItem, setAddedCartItem] = useState<{userId: string, productName: string} | null>(null);
   
   // User list state
   const [users, setUsers] = useState<User[]>([]);
@@ -389,13 +393,14 @@ const AddCustomProduct: React.FC = () => {
       // Send to API endpoint
       await api.post('/api/cart/add-custom', requestBody);
       
-      // Show success message and reset form
-      toast.success('Custom product added to user cart successfully!');
+      // Show success popup
+      setAddedCartItem({
+        userId: formData.UserId,
+        productName: formData.ProductName
+      });
+      setShowSuccessPopup(true);
       
-      // Scroll to top of page
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      // Reset form data
+      // Reset form data but keep the user ID for potential future additions
       setFormData({
         UserId: '',
         ProductName: '',
@@ -443,6 +448,74 @@ const AddCustomProduct: React.FC = () => {
           },
         }}
       />
+      
+      {/* Success Popup */}
+      <AnimatePresence>
+        {showSuccessPopup && addedCartItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <motion.div 
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative"
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25 }}
+            >
+              <button 
+                onClick={() => setShowSuccessPopup(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+                <h3 className="mt-3 text-lg font-medium text-gray-900">Success!</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  "{addedCartItem.productName}" has been added to the cart.
+                </p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSuccessPopup(false);
+                      router.push(`/user/${addedCartItem.userId}/cart`);
+                    }}
+                    className="flex-1 inline-flex justify-center items-center gap-2 rounded-md border border-transparent shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:w-auto sm:text-sm"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Go to Cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSuccessPopup(false);
+                      // Keep the user ID for next addition
+                      setFormData(prev => ({
+                        ...prev,
+                        ProductName: '',
+                        Description: '',
+                        BasePrice: '' as any,
+                        Quantity: 1,
+                        DocumentIds: []
+                      }));
+                      setUploadedFiles([]);
+                      setUploadPreviews([]);
+                      setDocumentUrls([]);
+                    }}
+                    className="flex-1 inline-flex justify-center items-center gap-2 rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Another
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
