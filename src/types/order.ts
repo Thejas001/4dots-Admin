@@ -62,17 +62,20 @@ export interface Comment {
 export interface Order {
   OrderId: number;
   UserId: string;
-  UserName: string | null;
+  Name: string | null;
   UserAddress: UserAddress | null;
+  PhoneNumber?: string;
   TotalAmount: number;
   OrderStatus: string;
-  CreatedAt: string;
   DeliveryType?: string;
+  DeliveryCharge?: number;
+  CreatedAt: string;
   Payment: {
     OrderPaymentId: number;
     OrderId: number;
     PaymentMethod: string;
     PaymentStatus: string;
+    TransactionId?: string;
     PaymentDate: string;
   } | null;
   Shipment: {

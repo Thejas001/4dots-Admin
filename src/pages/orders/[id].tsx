@@ -25,10 +25,6 @@ const OrderDetail = () => {
     try { return JSON.parse(text); } catch { return null; }
   };
 
-  const orderFromQuery = useMemo(() => {
-    return router.query.order ? JSON.parse(router.query.order as string) : null;
-  }, [router.query.order]);
-
   const fetchOrderById = async (orderId: number, silent = false) => {
     try {
       setDetailLoading(true);
@@ -39,8 +35,9 @@ const OrderDetail = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await parseJsonIfPossible(res);
-      if (!res.ok) throw new Error(data?.message || 'Failed');
-      setCurrentOrder(data);
+      if (!res.ok) throw new Error(data?.message || 'Failed to fetch order details');
+      if (!data?.Success) throw new Error(data?.Message || 'Failed to fetch order details');
+      setCurrentOrder(data.Data);
     } catch (err: any) {
       if (!silent) setNotification({ type: 'error', message: err.message });
     } finally {
@@ -51,16 +48,12 @@ const OrderDetail = () => {
   useEffect(() => {
     if (!id) return;
     const oid = Number(id);
-    if (isNaN(oid)) { setNotification({ type: 'error', message: 'Invalid ID' }); return; }
-
-    if (orderFromQuery && JSON.stringify(orderFromQuery) !== JSON.stringify(currentOrder)) {
-      setCurrentOrder(orderFromQuery);
-    } else {
-      const found = orders?.find(o => o.OrderId === oid);
-      if (found) setCurrentOrder(found);
-      else fetchOrderById(oid);
+    if (isNaN(oid)) { 
+      setNotification({ type: 'error', message: 'Invalid order ID' }); 
+      return; 
     }
-  }, [id, orderFromQuery, orders, currentOrder]);
+    fetchOrderById(oid);
+  }, [id]);
 
   const updateOrderStatus = async (status: number) => {
     if (status === 8) { setShowShippingModal(true); return; }
