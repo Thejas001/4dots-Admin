@@ -48,9 +48,9 @@ const OrderDetail = () => {
   useEffect(() => {
     if (!id) return;
     const oid = Number(id);
-    if (isNaN(oid)) { 
-      setNotification({ type: 'error', message: 'Invalid order ID' }); 
-      return; 
+    if (isNaN(oid)) {
+      setNotification({ type: 'error', message: 'Invalid order ID' });
+      return;
     }
     fetchOrderById(oid);
   }, [id]);
@@ -211,7 +211,12 @@ const OrderDetail = () => {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div><p className="text-gray-600 text-base sm:text-lg mb-2">Order Date</p><p className="text-black text-lg sm:text-xl font-semibold">{formatDate(currentOrder.CreatedAt)}</p></div>
                 <div><p className="text-gray-600 text-base sm:text-lg mb-2">Total Amount</p><p className="text-black text-lg sm:text-xl font-semibold">₹{currentOrder.TotalAmount}</p></div>
-                <div><p className="text-gray-600 text-base sm:text-lg mb-2">Delivery Type</p><p className="text-black text-lg sm:text-xl font-semibold">{currentOrder.DeliveryType || 'Not specified'}</p></div>
+                <div className="bg-gray-50 border-l-8 border-black rounded-r-xl p-5">
+                  <p className="text-gray-600 text-sm font-bold uppercase tracking-wider">Delivery Type</p>
+                  <p className="text-4xl font-black text-black mt-2">
+                    {currentOrder.DeliveryType || 'Not specified'}
+                  </p>
+                </div>
               </div>
             </div>
 
