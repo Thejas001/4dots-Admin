@@ -74,9 +74,7 @@ const OrderList = () => {
     }
 
     // Only refetch if we're not in the initial load
-    if (initFromQueryDoneRef.current) {
-      debouncedRefetch.current(pageNumber, 10, statusFilter);
-    }
+
   }, [pageNumber, statusFilter, router]);
 
   useEffect(() => {
