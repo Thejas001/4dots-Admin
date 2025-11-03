@@ -94,7 +94,7 @@ const OrderList = () => {
 
     router.push({
       pathname: `/orders/${order.OrderId}`,
-      query: { page: pageNumber, order: JSON.stringify(order) },
+      query: { page: pageNumber },
     });
   };
 

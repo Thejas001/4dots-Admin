@@ -48,7 +48,31 @@ export const useOrders = (pageNumber: number = 1, pageSize: number = 10, status?
       }
       const response = await api.get<OrderResponse>(url);
       if (response.data.Success) {
-        setOrders(response.data.Data);
+        // Normalize API summary items to the internal Order shape.
+        // Some endpoints (summary) return PaymentMethod at the root level
+        // instead of a nested Payment object. Map those into `Payment` so
+        // UI that uses `order.Payment?.PaymentMethod` continues to work.
+        const normalized = (response.data.Data as any[]).map((raw) => {
+          // If Payment already exists, keep it. Otherwise, build from top-level fields.
+          const payment = raw.Payment
+            ? raw.Payment
+            : raw.PaymentMethod
+            ? {
+                OrderPaymentId: raw.OrderPaymentId ?? 0,
+                OrderId: raw.OrderId ?? raw.OrderId ?? 0,
+                PaymentMethod: raw.PaymentMethod,
+                PaymentStatus: raw.PaymentStatus ?? '',
+                PaymentDate: raw.PaymentDate ?? '',
+              }
+            : null;
+
+          return {
+            ...raw,
+            Payment: payment,
+          } as unknown as Order;
+        });
+
+        setOrders(normalized);
         setPagination({
           TotalCount: response.data.TotalCount,
           PageNumber: response.data.PageNumber,
