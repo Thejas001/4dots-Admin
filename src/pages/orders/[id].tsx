@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { useOrders } from '@/hooks/useOrders';
 import { Order } from '@/types/order';
 import { API_CONFIG, DOWNLOAD_ORDERITEM_ZIP } from '@/config/api';
 
 const OrderDetail = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { orders, loading, error } = useOrders();
+
+  // Skip React Strict Mode fake first mount
+  const isFirstMount = useRef(true);
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
@@ -29,7 +31,10 @@ const OrderDetail = () => {
     try {
       setDetailLoading(true);
       const token = localStorage.getItem('auth_token');
-      if (!token) { if (!silent) setNotification({ type: 'error', message: 'Login required' }); return; }
+      if (!token) {
+        if (!silent) setNotification({ type: 'error', message: 'Login required' });
+        return;
+      }
 
       const res = await fetch(API_CONFIG.getFullUrl(API_CONFIG.ENDPOINTS.ORDER_DETAILS(orderId)), {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -45,7 +50,13 @@ const OrderDetail = () => {
     }
   };
 
+  // Fixed useEffect: Skip fake Strict Mode mount
   useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     if (!id) return;
     const oid = Number(id);
     if (isNaN(oid)) {
@@ -172,8 +183,8 @@ const OrderDetail = () => {
 
   const renderContent = () => {
     if (!id) return <div className="text-center py-20">Invalid Order ID</div>;
-    if (loading || detailLoading) return <div className="text-center py-20">Loading...</div>;
-    if (error || notification?.type === 'error') return <div className="text-center py-20 text-red-600">{error || notification?.message}</div>;
+    if (detailLoading) return <div className="text-center py-20">Loading...</div>;
+    if (notification?.type === 'error') return <div className="text-center py-20 text-red-600">{notification.message}</div>;
     if (!currentOrder) return <div className="text-center py-20">Order not found</div>;
 
     return (
@@ -321,9 +332,7 @@ const OrderDetail = () => {
 
                         {/* Price – REAL FROM API */}
                         <div className="text-right space-y-1">
-                          {calculatedPrice > 0 && calculatedPrice !== fallbackTotal && (
-                            <p className="text-sm text-orange-600 line-through">Est: ₹{fallbackTotal.toFixed(2)}</p>
-                          )}
+                         
                           <p className="text-2xl font-bold text-emerald-700">
                             ₹{finalPrice.toFixed(2)}
                           </p>
