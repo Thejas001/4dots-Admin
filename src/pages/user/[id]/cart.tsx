@@ -1,9 +1,11 @@
+'use client';
+
 import { useRouter } from 'next/router';
 import React, { useCallback, useEffect, useState, Fragment } from 'react';
 import api from '@/lib/axios';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Package, User, Mail, Phone, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Package, User, Mail, Phone, ArrowLeft } from 'lucide-react';
 
 /* ────────────────────── Interfaces ────────────────────── */
 interface CartItemAttribute {
@@ -56,70 +58,6 @@ interface CartResponse {
   success?: boolean;
 }
 
-/* ────────────────────── Delete Confirmation Modal ────────────────────── */
-const DeleteConfirmModal = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  productName,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  productName: string;
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">Remove Item?</h3>
-          </div>
-
-          <p className="text-sm text-gray-600 mb-6">
-            Are you sure you want to remove <span className="font-medium">"{productName}"</span> from the cart?
-          </p>
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
 /* ────────────────────── Component ────────────────────── */
 const UserCartPage = () => {
   const router = useRouter();
@@ -134,17 +72,6 @@ const UserCartPage = () => {
     totalPrice: 0,
     deliveryCharge: 0,
     totalItemsPrice: 0,
-  });
-
-  // Delete modal state
-  const [deleteModal, setDeleteModal] = useState<{
-    open: boolean;
-    cartItemId: number | null;
-    productName: string;
-  }>({
-    open: false,
-    cartItemId: null,
-    productName: '',
   });
 
   /* ───── Parse user from query ───── */
@@ -227,31 +154,6 @@ const UserCartPage = () => {
     fetchCart();
   }, [fetchCart]);
 
-  /* ───── Remove item with confirmation ───── */
-  const confirmRemove = (cartItemId: number, productName: string) => {
-    setDeleteModal({
-      open: true,
-      cartItemId,
-      productName,
-    });
-  };
-
-  const removeItem = async () => {
-    const { cartItemId } = deleteModal;
-    if (!cartItemId) return;
-
-    // Optimistically update UI
-    setCart((prev) => prev.filter((i) => i.CartItemId !== cartItemId));
-
-    try {
-      await api.delete(`/api/cart/items/${cartItemId}`);
-      await fetchCart(); // Refresh from server
-    } catch (err) {
-      console.error('Failed to delete item:', err);
-      await fetchCart(); // Revert on error
-    }
-  };
-
   /* ───── Loading / Error ───── */
   if (loading) {
     return (
@@ -298,7 +200,6 @@ const UserCartPage = () => {
                 <Package className="w-7 h-7 sm:w-8 sm:h-8 text-teal-600" />
                 Shopping Cart
               </h1>
-
             </div>
             <Link
               href="/user-carts"
@@ -452,22 +353,22 @@ const UserCartPage = () => {
                                     <h5 className="text-xs font-semibold text-gray-500 mb-1">PRINT DETAILS</h5>
                                     <div className="grid grid-cols-2 gap-1.5 text-sm">
                                       {item.DynamicAttributes.map((attr, i) => {
-                                        // Skip if attribute is empty
                                         if (!attr.AttributeValue) return null;
-                                        
-                                        // Format label for display
-                                        const formatLabel = (label: string) => {
-                                          return label
-                                            .replace(/([A-Z])/g, ' $1')
-                                            .replace(/^./, str => str.toUpperCase())
-                                            .trim();
-                                        };
 
-                                        // Special handling for color print range
+                                        const formatLabel = (label: string) =>
+                                          label
+                                            .replace(/([A-Z])/g, ' $1')
+                                            .replace(/^./, (s) => s.toUpperCase())
+                                            .trim();
+
                                         if (attr.AttributeName === 'ColorPrintRange') {
-                                          const pageCount = item.DynamicAttributes.find(a => a.AttributeName === 'PageCount')?.AttributeValue;
-                                          const colorPageCount = item.DynamicAttributes.find(a => a.AttributeName === 'TotalColorPageCount')?.AttributeValue;
-                                          
+                                          const pageCount = item.DynamicAttributes.find(
+                                            (a) => a.AttributeName === 'PageCount'
+                                          )?.AttributeValue;
+                                          const colorPageCount = item.DynamicAttributes.find(
+                                            (a) => a.AttributeName === 'TotalColorPageCount'
+                                          )?.AttributeValue;
+
                                           return (
                                             <Fragment key={`dyn-${i}`}>
                                               <div className="font-medium text-gray-700">Color Pages:</div>
@@ -478,7 +379,9 @@ const UserCartPage = () => {
                                                 <Fragment>
                                                   <div className="font-medium text-gray-700">Black & White Pages:</div>
                                                   <div className="text-gray-900">
-                                                    {parseInt(pageCount) - (parseInt(colorPageCount || '0') || 0)} pages
+                                                    {parseInt(pageCount) -
+                                                      (parseInt(colorPageCount || '0') || 0)}{' '}
+                                                    pages
                                                   </div>
                                                 </Fragment>
                                               )}
@@ -486,12 +389,9 @@ const UserCartPage = () => {
                                           );
                                         }
 
-                                        // Skip these as they're handled above
-                                        if (['PageCount', 'TotalColorPageCount'].includes(attr.AttributeName)) {
+                                        if (['PageCount', 'TotalColorPageCount'].includes(attr.AttributeName))
                                           return null;
-                                        }
 
-                                        // Handle NumberOfCopies specially
                                         if (attr.AttributeName === 'NumberOfCopies') {
                                           return (
                                             <Fragment key={`dyn-${i}`}>
@@ -501,11 +401,15 @@ const UserCartPage = () => {
                                           );
                                         }
 
-                                        // Handle ProductComment specially
                                         if (attr.AttributeName === 'ProductComment') {
                                           return (
-                                            <div key={`dyn-${i}`} className="col-span-2 mt-2 pt-2 border-t border-gray-100">
-                                              <div className="text-xs font-medium text-gray-500 mb-1">CUSTOMER NOTE</div>
+                                            <div
+                                              key={`dyn-${i}`}
+                                              className="col-span-2 mt-2 pt-2 border-t border-gray-100"
+                                            >
+                                              <div className="text-xs font-medium text-gray-500 mb-1">
+                                                CUSTOMER NOTE
+                                              </div>
                                               <p className="text-sm text-gray-700 bg-amber-50 p-2 rounded-md">
                                                 {attr.AttributeValue}
                                               </p>
@@ -513,15 +417,12 @@ const UserCartPage = () => {
                                           );
                                         }
 
-                                        // Default rendering for other attributes
                                         return (
                                           <Fragment key={`dyn-${i}`}>
                                             <div className="font-medium text-gray-700">
                                               {formatLabel(attr.AttributeName)}:
                                             </div>
-                                            <div className="text-gray-900">
-                                              {attr.AttributeValue}
-                                            </div>
+                                            <div className="text-gray-900">{attr.AttributeValue}</div>
                                           </Fragment>
                                         );
                                       })}
@@ -532,7 +433,7 @@ const UserCartPage = () => {
                                 {/* Addons */}
                                 {item.Addons?.length > 0 && (
                                   <div className="mt-2 pt-2 border-t border-gray-100">
-                                    <h5 className="text-xs font-semibold text-gray-500 mb-1">ADD-ONS</h5>
+                                    <h5 className="text-xs font-semibold text-gray-500 mb-1">ADD-ONS</  h5>
                                     <ul className="space-y-1">
                                       {item.Addons.map((addon: any, i: number) => (
                                         <li key={`addon-${i}`} className="text-sm text-gray-700">
@@ -546,24 +447,11 @@ const UserCartPage = () => {
                                 )}
                               </div>
 
-                              {/* Quantity + Remove */}
+                              {/* Quantity */}
                               <div className="flex items-center justify-between mt-3">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-gray-500">Qty:</span>
                                   <span className="font-semibold text-gray-900">{item.Quantity}</span>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                  <p className="text-sm font-medium text-gray-600">
-
-                                  </p>
-                                  <button
-                                    onClick={() => confirmRemove(item.CartItemId, item.ProductName)}
-                                    className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors touch-manipulation"
-                                    style={{ minHeight: '44px', minWidth: '44px' }}
-                                  >
-                                    <Trash2 className="w-5 h-5" />
-                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -597,7 +485,9 @@ const UserCartPage = () => {
                       <div className="flex justify-between text-gray-600 text-sm sm:text-base">
                         <span>Delivery</span>
                         <span className="font-medium text-gray-900">
-                          {cartSummary.deliveryCharge > 0 ? `₹${cartSummary.deliveryCharge.toFixed(2)}` : 'Free'}
+                          {cartSummary.deliveryCharge > 0
+                            ? `₹${cartSummary.deliveryCharge.toFixed(2)}`
+                            : 'Free'}
                         </span>
                       </div>
                     </div>
@@ -605,7 +495,9 @@ const UserCartPage = () => {
                     <div className="border-t border-gray-200 pt-4">
                       <div className="flex justify-between">
                         <span className="text-base sm:text-lg font-semibold text-gray-900">Total</span>
-                        <span className="text-xl sm:text-2xl font-bold text-teal-600">₹{total.toFixed(2)}</span>
+                        <span className="text-xl sm:text-2xl font-bold text-teal-600">
+                          ₹{total.toFixed(2)}
+                        </span>
                       </div>
                     </div>
 
@@ -630,14 +522,6 @@ const UserCartPage = () => {
           <div className="h-20 lg:hidden"></div>
         </div>
       </div>
-
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={deleteModal.open}
-        onClose={() => setDeleteModal({ ...deleteModal, open: false })}
-        onConfirm={removeItem}
-        productName={deleteModal.productName}
-      />
     </>
   );
 };
