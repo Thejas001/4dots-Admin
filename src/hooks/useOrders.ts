@@ -36,47 +36,52 @@ export const useOrders = (
   });
 
   const { isAuthenticated } = useAuth();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // This ref helps us skip the fake first mount in React Strict Mode
-  const isFirstMount = useRef(true);
+  const normalizeOrder = useCallback((raw: any): Order => {
+    const payment = raw.Payment || (raw.PaymentMethod ? {
+      OrderPaymentId: raw.OrderPaymentId ?? 0,
+      OrderId: raw.OrderId ?? 0,
+      PaymentMethod: raw.PaymentMethod,
+      PaymentStatus: raw.PaymentStatus ?? '',
+      PaymentDate: raw.PaymentDate ?? '',
+    } : null);
+
+    return { ...raw, Payment: payment } as Order;
+  }, []);
 
   const fetchOrders = useCallback(
-    async (pageNum = pageNumber, pageSz = pageSize, statusFilter = status) => {
+    async (pageNum: number, pageSz: number, statusFilter?: string) => {
       if (!isAuthenticated) {
         setError('Authentication required');
         setLoading(false);
         return;
       }
 
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
         setLoading(true);
         setError(null);
 
-        let url = `/api/order/summary?pageNumber=${pageNum}&pageSize=${pageSz}`;
-        if (statusFilter && statusFilter !== 'all') {
-          url += `&orderStatus=${statusFilter}`;
-        }
+        const params = new URLSearchParams({
+          pageNumber: pageNum.toString(),
+          pageSize: pageSz.toString(),
+          ...(statusFilter && statusFilter !== 'all' && { orderStatus: statusFilter })
+        });
 
-        // No signal, no cancel — just one clean call
-        const response = await api.get<OrderResponse>(url);
+        const response = await api.get<OrderResponse>(`/api/order/summary?${params.toString()}`, {
+          signal: controller.signal as AbortSignal
+        } as any);
 
         if (response.data.Success) {
-          const normalized = (response.data.Data as any[]).map((raw) => {
-            const payment = raw.Payment
-              ? raw.Payment
-              : raw.PaymentMethod
-              ? {
-                  OrderPaymentId: raw.OrderPaymentId ?? 0,
-                  OrderId: raw.OrderId ?? 0,
-                  PaymentMethod: raw.PaymentMethod,
-                  PaymentStatus: raw.PaymentStatus ?? '',
-                  PaymentDate: raw.PaymentDate ?? '',
-                }
-              : null;
-
-            return { ...raw, Payment: payment } as Order;
-          });
-
+          const normalized = response.data.Data.map(normalizeOrder);
           setOrders(normalized);
           setPagination({
             TotalCount: response.data.TotalCount,
@@ -89,32 +94,35 @@ export const useOrders = (
         } else {
           setError('Failed to fetch orders');
         }
-      } catch (err) {
-        setError('Failed to fetch orders');
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Error fetching orders:', err);
+          setError('Failed to fetch orders');
+        }
       } finally {
-        setLoading(false);
+        if (abortControllerRef.current === controller) {
+          setLoading(false);
+          abortControllerRef.current = null;
+        }
       }
     },
-    [isAuthenticated, pageNumber, pageSize, status]
+    [isAuthenticated, normalizeOrder]
   );
 
-  // Run only on the REAL mount (not Strict Mode fake)
+  // Handle initial fetch and parameter changes
   useEffect(() => {
-    // Skip the first fake mount in Strict Mode
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      if (!isAuthenticated) {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // This runs only on the second (real) mount
     if (isAuthenticated) {
       fetchOrders(pageNumber, pageSize, status);
     } else {
       setLoading(false);
     }
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [isAuthenticated, pageNumber, pageSize, status, fetchOrders]);
 
   // Stable refetch function

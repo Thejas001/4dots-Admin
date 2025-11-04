@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Order } from '@/types/order';
 import { API_CONFIG, DOWNLOAD_ORDERITEM_ZIP } from '@/config/api';
@@ -7,16 +7,15 @@ const OrderDetail = () => {
   const router = useRouter();
   const { id } = router.query;
 
-  // Skip React Strict Mode fake first mount
-  const isFirstMount = useRef(true);
-
   const [isUpdating, setIsUpdating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(true);
   const [showShippingModal, setShowShippingModal] = useState(false);
   const [shippingData, setShippingData] = useState({
-    trackingNumber: '', trackingUrl: '', courierName: ''
+    trackingNumber: '',
+    trackingUrl: '',
+    courierName: ''
   });
   const [newComment, setNewComment] = useState('');
 
@@ -29,7 +28,7 @@ const OrderDetail = () => {
 
   const fetchOrderById = async (orderId: number, silent = false) => {
     try {
-      setDetailLoading(true);
+      setDetailLoading(!silent);
       const token = localStorage.getItem('auth_token');
       if (!token) {
         if (!silent) setNotification({ type: 'error', message: 'Login required' });
@@ -50,21 +49,19 @@ const OrderDetail = () => {
     }
   };
 
-  // Fixed useEffect: Skip fake Strict Mode mount
+  // FIXED: Wait for router.isReady + id
   useEffect(() => {
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      return;
-    }
+    if (!router.isReady || !id) return;
 
-    if (!id) return;
     const oid = Number(id);
     if (isNaN(oid)) {
       setNotification({ type: 'error', message: 'Invalid order ID' });
+      setDetailLoading(false);
       return;
     }
+
     fetchOrderById(oid);
-  }, [id]);
+  }, [router.isReady, id]);
 
   const updateOrderStatus = async (status: number) => {
     if (status === 8) { setShowShippingModal(true); return; }
@@ -181,18 +178,39 @@ const OrderDetail = () => {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
+  // FIXED: Proper loading states
   const renderContent = () => {
-    if (!id) return <div className="text-center py-20">Invalid Order ID</div>;
-    if (detailLoading) return <div className="text-center py-20">Loading...</div>;
-    if (notification?.type === 'error') return <div className="text-center py-20 text-red-600">{notification.message}</div>;
-    if (!currentOrder) return <div className="text-center py-20">Order not found</div>;
+    // 1. Still waiting for router
+    if (!router.isReady) {
+      return <div className="text-center py-20">Loading order...</div>;
+    }
+
+    // 2. No ID
+    if (!id) {
+      return <div className="text-center py-20">Invalid Order ID</div>;
+    }
+
+    // 3. Loading data
+    if (detailLoading) {
+      return <div className="text-center py-20">Loading order details...</div>;
+    }
+
+    // 4. Error
+    if (notification?.type === 'error' && !currentOrder) {
+      return <div className="text-center py-20 text-red-600">{notification.message}</div>;
+    }
+
+    // 5. No order
+    if (!currentOrder) {
+      return <div className="text-center py-20">Order not found</div>;
+    }
 
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-black hover:text-gray-700 text-base sm:text-lg">
-            Back to Orders
+            ← Back to Orders
           </button>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-black text-center sm:text-right">Order #{currentOrder.OrderId}</h1>
         </div>
@@ -251,21 +269,17 @@ const OrderDetail = () => {
               <h2 className="text-2xl font-bold text-black mb-6">Order Items</h2>
               <div className="space-y-6">
                 {(currentOrder?.Items ?? []).map((item, index) => {
-                  // Get REAL calculated price from API
                   const calculatedPriceStr = item.DynamicAttributes?.find(
                     (d: any) => d.AttributeName === 'CalculatedTotalPrice'
                   )?.AttributeValue;
                   const calculatedPrice = calculatedPriceStr ? parseFloat(calculatedPriceStr) : 0;
 
-                  // Fallback manual calc (for non-paperprint or debug)
                   const basePrice = item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price ?? 0) : (item.Price ?? 0);
                   const baseTotal = basePrice * (item.Quantity ?? 1);
                   const addonsTotal = (item.Addons ?? []).reduce((s: number, a: any) => s + ((a.AddonPrice ?? 0) * (a.NumberOfBooks ?? 1)), 0);
                   const fallbackTotal = baseTotal + addonsTotal;
-
                   const finalPrice = calculatedPrice > 0 ? calculatedPrice : fallbackTotal;
 
-                  // Extract details
                   const comment = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'ProductComment')?.AttributeValue;
                   const colorRange = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'ColorPrintRange')?.AttributeValue;
                   const pageCount = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'PageCount')?.AttributeValue;
@@ -286,7 +300,6 @@ const OrderDetail = () => {
                             <span className="text-gray-600">Unit Price: <strong>₹{basePrice.toFixed(2)}</strong></span>
                           </div>
 
-                          {/* Special Comment */}
                           {comment && (
                             <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                               <p className="font-semibold text-yellow-800 text-sm">Special Instructions</p>
@@ -294,7 +307,6 @@ const OrderDetail = () => {
                             </div>
                           )}
 
-                          {/* Print Specs */}
                           {item.Attributes?.length > 0 && (
                             <div className="text-sm space-y-1">
                               {item.Attributes.map((a: any, i: number) => (
@@ -306,7 +318,6 @@ const OrderDetail = () => {
                             </div>
                           )}
 
-                          {/* Add-ons */}
                           {(item.Addons ?? []).length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               {(item.Addons ?? []).map((a: any, i: number) => (
@@ -318,7 +329,6 @@ const OrderDetail = () => {
                             </div>
                           )}
 
-                          {/* Print Details */}
                           {(colorRange || pageCount || colorPages || bwPages || copies) && (
                             <div className="flex flex-wrap gap-3 text-sm mt-2">
                               {colorRange && <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full font-medium">Color: {colorRange}</span>}
@@ -330,9 +340,7 @@ const OrderDetail = () => {
                           )}
                         </div>
 
-                        {/* Price – REAL FROM API */}
                         <div className="text-right space-y-1">
-                         
                           <p className="text-2xl font-bold text-emerald-700">
                             ₹{finalPrice.toFixed(2)}
                           </p>
@@ -347,7 +355,6 @@ const OrderDetail = () => {
                         </div>
                       </div>
 
-                      {/* Documents */}
                       {item.Documents?.length > 0 && (
                         <div className="mt-4">
                           <h4 className="font-bold text-base mb-3">Documents</h4>
