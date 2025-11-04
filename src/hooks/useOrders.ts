@@ -95,7 +95,14 @@ export const useOrders = (
           setError('Failed to fetch orders');
         }
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
+        // Ignore cancellation errors (request was aborted intentionally)
+        const isCancelled = 
+          err.name === 'AbortError' || 
+          err.name === 'CanceledError' || 
+          err.code === 'ERR_CANCELED' ||
+          (err.message && err.message.toLowerCase().includes('canceled'));
+        
+        if (!isCancelled) {
           console.error('Error fetching orders:', err);
           setError('Failed to fetch orders');
         }
