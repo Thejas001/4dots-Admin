@@ -100,9 +100,9 @@ const UserCartPage = () => {
       setLoading(true);
       setError('');
 
-      const response = await api.get<CartResponse>(
-        `https://fourdotsapp.azurewebsites.net/api/cart/admin?userId=${id}`
-      );
+      const response = await api.get<CartResponse>('/api/cart/admin', {
+        params: { UserId: id }
+      });
 
       const cartData = response.data.data;
 
@@ -144,7 +144,17 @@ const UserCartPage = () => {
       }
     } catch (err: any) {
       console.error('Error fetching cart:', err);
-      setError('Failed to load cart. Please try again.');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load cart. Please try again.';
+      setError(errorMessage);
+      
+      // If it's a 400 error, log the full response for debugging
+      if (err.response?.status === 400) {
+        console.error('Bad Request Details:', {
+          status: err.response.status,
+          data: err.response.data,
+          userId: id
+        });
+      }
     } finally {
       setLoading(false);
     }
