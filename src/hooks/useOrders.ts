@@ -54,7 +54,7 @@ export const useOrders = (
 
         let url = `/api/order/summary?pageNumber=${pageNum}&pageSize=${pageSz}`;
         if (statusFilter && statusFilter !== 'all') {
-          url += `&status=${statusFilter}`;
+          url += `&orderStatus=${statusFilter}`;
         }
 
         // No signal, no cancel — just one clean call
