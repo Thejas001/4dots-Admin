@@ -49,7 +49,6 @@ const OrderDetail = () => {
     }
   };
 
-  // FIXED: Wait for router.isReady + id
   useEffect(() => {
     if (!router.isReady || !id) return;
 
@@ -178,29 +177,26 @@ const OrderDetail = () => {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
-  // FIXED: Proper loading states
+  const getDynamicAttr = (attrs: any[] = [], name: string) =>
+    attrs.find((a: any) => a.AttributeName === name)?.AttributeValue;
+
   const renderContent = () => {
-    // 1. Still waiting for router
     if (!router.isReady) {
       return <div className="text-center py-20">Loading order...</div>;
     }
 
-    // 2. No ID
     if (!id) {
       return <div className="text-center py-20">Invalid Order ID</div>;
     }
 
-    // 3. Loading data
     if (detailLoading) {
       return <div className="text-center py-20">Loading order details...</div>;
     }
 
-    // 4. Error
     if (notification?.type === 'error' && !currentOrder) {
       return <div className="text-center py-20 text-red-600">{notification.message}</div>;
     }
 
-    // 5. No order
     if (!currentOrder) {
       return <div className="text-center py-20">Order not found</div>;
     }
@@ -210,7 +206,7 @@ const OrderDetail = () => {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-black hover:text-gray-700 text-base sm:text-lg">
-            ← Back to Orders
+            Back to Orders
           </button>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-black text-center sm:text-right">Order #{currentOrder.OrderId}</h1>
         </div>
@@ -280,12 +276,13 @@ const OrderDetail = () => {
                   const fallbackTotal = baseTotal + addonsTotal;
                   const finalPrice = calculatedPrice > 0 ? calculatedPrice : fallbackTotal;
 
-                  const comment = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'ProductComment')?.AttributeValue;
-                  const colorRange = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'ColorPrintRange')?.AttributeValue;
-                  const pageCount = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'PageCount')?.AttributeValue;
-                  const colorPages = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'TotalColorPageCount')?.AttributeValue;
-                  const bwPages = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'TotalBwPageCount')?.AttributeValue;
-                  const copies = item.DynamicAttributes?.find((d: any) => d.AttributeName === 'NumberOfCopies')?.AttributeValue;
+                  const comment = getDynamicAttr(item.DynamicAttributes, 'ProductComment');
+                  const colorRange = getDynamicAttr(item.DynamicAttributes, 'ColorPrintRange');
+                  const pageCount = getDynamicAttr(item.DynamicAttributes, 'PageCount');
+                  const colorPages = getDynamicAttr(item.DynamicAttributes, 'TotalColorPageCount');
+                  const bwPages = getDynamicAttr(item.DynamicAttributes, 'TotalBwPageCount');
+                  const copies = getDynamicAttr(item.DynamicAttributes, 'NumberOfCopies');
+                  const numberOfCards = getDynamicAttr(item.DynamicAttributes, 'NumberOfCards');
 
                   return (
                     <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
@@ -329,13 +326,14 @@ const OrderDetail = () => {
                             </div>
                           )}
 
-                          {(colorRange || pageCount || colorPages || bwPages || copies) && (
+                          {(colorRange || pageCount || colorPages || bwPages || copies || numberOfCards) && (
                             <div className="flex flex-wrap gap-3 text-sm mt-2">
                               {colorRange && <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full font-medium">Color: {colorRange}</span>}
                               {pageCount && <span className="text-gray-700"><strong>Total Pages:</strong> {pageCount}</span>}
                               {colorPages && <span className="text-teal-700"><strong>Color Pages:</strong> {colorPages}</span>}
                               {bwPages && <span className="text-gray-700"><strong>B&W Pages:</strong> {bwPages}</span>}
                               {copies && <span className="text-gray-700"><strong>Copies:</strong> {copies}</span>}
+                              {numberOfCards && <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-medium">Number of Cards: {numberOfCards}</span>}
                             </div>
                           )}
                         </div>
