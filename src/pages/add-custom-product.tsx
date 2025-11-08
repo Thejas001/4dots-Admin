@@ -32,19 +32,23 @@ interface DocumentUploadResponse {
 
 const AddCustomProduct: React.FC = () => {
   const router = useRouter();
+  
+  // State for form data
   const [formData, setFormData] = useState<CustomProduct>({
     UserId: '',
     ProductName: '',
     Description: '',
-    BasePrice: '' as any,
+    BasePrice: 0,
     Quantity: 1,
     DocumentIds: []
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // State for file uploads
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
   const [documentUrls, setDocumentUrls] = useState<string[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [addedCartItem, setAddedCartItem] = useState<{userId: string, productName: string} | null>(null);
   
@@ -127,14 +131,65 @@ const AddCustomProduct: React.FC = () => {
   };
 
   // Select user and auto-fill user ID
-  const selectUser = (user: User) => {
+  const selectUser = (user: User, silent: boolean = false) => {
+    // Prevent unnecessary updates if the same user is already selected
+    if (selectedUser?.Id === user.Id) return;
+    
     setSelectedUser(user);
     setFormData(prev => ({
       ...prev,
       UserId: user.Id
     }));
-    toast.success(`Selected user: ${user.UserName}`);
+    
+    // Only show toast if not in silent mode (for auto-selection)
+    if (!silent) {
+      toast.success(`Selected user: ${user.UserName}`);
+    }
   };
+
+  // Handle userId from URL and load users on component mount
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    const { userId } = router.query;
+    if (!userId) return;
+    
+    const loadUserFromUrl = async () => {
+      try {
+        // First try to find user in the already loaded users
+        const existingUser = users.find(u => u.Id === userId);
+        if (existingUser) {
+          selectUser(existingUser);
+          return;
+        }
+        
+        // If user not found, try to find the user in the full list
+        const fullUserListResponse = await api.get<{ Items: User[] }>(
+          `/api/user/admin/list?pageNumber=1&pageSize=1000`
+        );
+        const allUsers = fullUserListResponse.data?.Items || [];
+        const userData = allUsers.find(u => u.Id === userId);
+        
+        if (userData) {
+          // Add the user to the current users list if not already present
+          setUsers(prev => {
+            // Check if user already exists in the list
+            const exists = prev.some(u => u.Id === userData.Id);
+            return exists ? prev : [...prev, userData];
+          });
+          // Use silent mode to prevent duplicate toasts
+          selectUser(userData, true);
+        } else {
+          throw new Error('Invalid user data received from server');
+        }
+      } catch (error) {
+        console.error('Error loading user from URL:', error);
+        toast.error('Failed to load user details');
+      }
+    };
+    
+    loadUserFromUrl();
+  }, [router.isReady, router.query.userId, users]);
 
   // Create new user
   const createUser = async (e: React.FormEvent) => {
@@ -238,17 +293,7 @@ const AddCustomProduct: React.FC = () => {
     fetchUsers(1, searchQuery);
   };
 
-  // Pagination handlers
-  const handlePageChange = (newPage: number) => {
-    setUserPage(newPage);
-    fetchUsers(newPage, searchQuery);
-  };
-
-  // Load users on component mount
-  useEffect(() => {
-    fetchUsers(userPage, searchQuery);
-  }, [userPage]);
-
+  // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -256,6 +301,55 @@ const AddCustomProduct: React.FC = () => {
       [name]: name === 'BasePrice' || name === 'Quantity' ? Number(value) : value
     }));
   };
+
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setUserPage(newPage);
+    fetchUsers(newPage, searchQuery);
+  };
+
+  // Handle userId from URL and load users on component mount
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    const { userId } = router.query;
+    if (!userId) return;
+    
+    const loadUserFromUrl = async () => {
+      try {
+        // First try to find user in the already loaded users
+        const existingUser = users.find(u => u.Id === userId);
+        if (existingUser) {
+          selectUser(existingUser, true);
+          return;
+        }
+        
+        // If user not found, try to find the user in the full list
+        const fullUserListResponse = await api.get<{ Items: User[] }>(
+          `/api/user/admin/list?pageNumber=1&pageSize=1000`
+        );
+        const allUsers = fullUserListResponse.data?.Items || [];
+        const userData = allUsers.find(u => u.Id === userId);
+        
+        if (userData) {
+          // Add the user to the current users list if not already present
+          setUsers(prev => {
+            const exists = prev.some(u => u.Id === userData.Id);
+            return exists ? prev : [...prev, userData];
+          });
+          // Use silent mode to prevent duplicate toasts
+          selectUser(userData, true);
+        } else {
+          throw new Error('User not found');
+        }
+      } catch (error) {
+        console.error('Error loading user from URL:', error);
+        toast.error('Failed to load user details');
+      }
+    };
+    
+    loadUserFromUrl();
+  }, [router.isReady, router.query.userId, users, selectUser]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;

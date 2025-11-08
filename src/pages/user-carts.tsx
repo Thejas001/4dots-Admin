@@ -260,7 +260,7 @@ const UserCartsPage = () => {
                         </span>
                         {user.CreatedByAdmin && (
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                            Admin
+                            Created By Admin
                           </span>
                         )}
                       </div>
@@ -372,7 +372,7 @@ const UserCartsPage = () => {
                           </span>
                           {user.CreatedByAdmin && (
                             <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                              Admin
+                              Created By Admin
                             </span>
                           )}
                         </div>

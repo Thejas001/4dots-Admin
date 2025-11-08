@@ -211,13 +211,24 @@ const UserCartPage = () => {
                 Shopping Cart
               </h1>
             </div>
-            <Link
-              href="/user-carts"
-              className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium transition-colors text-sm sm:text-base"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back to Users
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <Link
+                href={`/add-custom-product?userId=${id}`}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm sm:text-base font-medium"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Custom Product
+              </Link>
+              <Link
+                href="/user-carts"
+                className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium transition-colors text-sm sm:text-base"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Back to Users
+              </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
