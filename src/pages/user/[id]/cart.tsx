@@ -8,6 +8,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Package, User, Mail, Phone, ArrowLeft } from 'lucide-react';
 
 /* ────────────────────── Interfaces ────────────────────── */
+
+interface ApiResponse<T = any> {
+  success?: boolean;
+  message?: string;
+  data?: T;
+}
+
 interface CartItemAttribute {
   AttributeName: string;
   AttributeValue: string;
@@ -67,12 +74,15 @@ const UserCartPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [cartSummary, setCartSummary] = useState({
     totalItems: 0,
     totalPrice: 0,
     deliveryCharge: 0,
     totalItemsPrice: 0,
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
   /* ───── Parse user from query ───── */
   useEffect(() => {
@@ -94,6 +104,114 @@ const UserCartPage = () => {
   }, [router.isReady, router.query, id]);
 
   /* ───── Fetch cart ───── */
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      handleRemoveItem(itemToDelete);
+    }
+    setShowDeleteModal(false);
+  };
+
+  const handleRemoveClick = (cartItemId: number) => {
+    setItemToDelete(cartItemId);
+    setShowDeleteModal(true);
+  };
+
+  const handleRemoveItem = async (cartItemId: number) => {
+    
+    try {
+      setDeletingId(cartItemId);
+      setError('');
+      
+      console.log('Attempting to remove cart item ID:', cartItemId);
+      
+      // Add request interceptor for logging
+      const requestInterceptor = api.interceptors.request.use(config => {
+        console.log('Request config:', config);
+        return config;
+      });
+      
+      // Add response interceptor for logging
+      const responseInterceptor = api.interceptors.response.use(
+        response => {
+          console.log('Response:', response);
+          return response;
+        },
+        error => {
+          console.error('Error response:', error.response);
+          return Promise.reject(error);
+        }
+      );
+      
+      try {
+        if (!id) {
+          throw new Error('User ID is not available');
+        }
+        
+        const url = `/api/cart/admin/remove-item/${cartItemId}?userId=${id}`;
+        console.log('Sending DELETE request to:', url);
+        
+        const response = await api.delete<ApiResponse>(url, {
+          validateStatus: (status) => true, // Don't throw for any status code
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          params: {
+            userId: id // Also include in params for good measure
+          }
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response data:', response.data);
+        
+        if (response.status === 200) {
+          // Refresh the cart after successful deletion
+          await fetchCart();
+        } else if (response.status === 400) {
+          // Handle 400 Bad Request specifically
+          const errorDetails = response.data?.message || 'Invalid request. Please check the item ID and try again.';
+          console.error('Bad Request Details:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data,
+            headers: response.headers
+          });
+          throw new Error(`Bad Request: ${errorDetails}`);
+        } else {
+          // Handle other error statuses
+          throw new Error(response.data?.message || `Server responded with status: ${response.status}`);
+        }
+      } finally {
+        // Remove the interceptors to prevent memory leaks
+        api.interceptors.request.eject(requestInterceptor);
+        api.interceptors.response.eject(responseInterceptor);
+      }
+      
+    } catch (error: unknown) {
+      console.error('Error removing item:', error);
+      
+      // Type guard to check if error is an AxiosError
+      const isAxiosError = (error: any): error is { response?: { data?: { message?: string } } } => {
+        return error && typeof error === 'object' && 'response' in error;
+      };
+      
+      // Type guard for standard Error
+      const isError = (error: any): error is Error => {
+        return error && typeof error === 'object' && 'message' in error;
+      };
+      
+      let errorMessage = 'Failed to remove item. Please try again.';
+      
+      if (isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || errorMessage;
+      } else if (isError(error)) {
+        errorMessage = error.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const fetchCart = useCallback(async () => {
     if (!id) return;
     try {
@@ -468,12 +586,34 @@ const UserCartPage = () => {
                                 )}
                               </div>
 
-                              {/* Quantity */}
+                              {/* Quantity and Actions */}
                               <div className="flex items-center justify-between mt-3">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-gray-500">Qty:</span>
                                   <span className="font-semibold text-gray-900">{item.Quantity}</span>
                                 </div>
+                                <button
+                                  onClick={() => handleRemoveClick(item.CartItemId)}
+                                  disabled={deletingId === item.CartItemId}
+                                  className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {deletingId === item.CartItemId ? (
+                                    <>
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Removing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Remove
+                                    </>
+                                  )}
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -543,6 +683,64 @@ const UserCartPage = () => {
           <div className="h-20 lg:hidden"></div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <svg 
+                    className="h-6 w-6 text-red-600" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+                    />
+                  </svg>
+                </div>
+                <h3 className="mt-3 text-lg font-medium text-gray-900">Remove Item</h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to remove this item from the cart?
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-xl">
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deletingId === itemToDelete}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingId === itemToDelete ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Removing...
+                  </>
+                ) : 'Remove'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -3,7 +3,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
 
-type PresetRange = 'last7days' | 'last30days' | 'today' | 'yesterday' | 'custom';
+type PresetRange = 'last7days' | 'monthly' | 'today' | 'yesterday' | 'custom';
 type MetricType = 'orders' | 'newUsers' | 'totalAmount' | 'bestSelling';
 
 interface BestSellingItem {
@@ -56,7 +56,7 @@ const getMetricValue = (source: unknown, keys: string[]): number => {
 
 const presetOptions: { value: PresetRange; label: string }[] = [
   { value: 'last7days', label: 'Last 7 days' },
-  { value: 'last30days', label: 'Last 30 days' },
+  { value: 'monthly', label: 'Monthly' },
   { value: 'today', label: 'Today' },
   { value: 'yesterday', label: 'Yesterday' },
   { value: 'custom', label: 'Custom' },
@@ -72,6 +72,7 @@ const InsightsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('orders');
   const [topSellersSort, setTopSellersSort] = useState<'amount' | 'count'>('amount');
+  const [currentMonthOffset, setCurrentMonthOffset] = useState(0); // 0 = current month, -1 = previous month, etc.
 
   const activeType = useMemo(() => {
     if (preset === 'custom') {
@@ -79,6 +80,11 @@ const InsightsPage = () => {
     }
     return preset;
   }, [preset, customType]);
+
+  // Reset month offset when changing preset
+  useEffect(() => {
+    setCurrentMonthOffset(0);
+  }, [preset]);
 
   const dailyChartData = useMemo(() => {
     if (!data?.Details || !Array.isArray(data.Details)) {
@@ -88,29 +94,72 @@ const InsightsPage = () => {
     
     console.log('Processing Details:', data.Details);
     
-    return data.Details.map(detail => {
-      const date = new Date(detail.Date);
-      const formattedDate = `${date.getDate()}/${date.getMonth() + 1}`;
-      
-      let value = 0;
-      switch (selectedMetric) {
-        case 'orders':
-          value = detail.OrdersCount;
-          break;
-        case 'newUsers':
-          value = detail.NewUsersCount;
-          break;
-        case 'totalAmount':
-          value = detail.TotalAmount;
-          break;
+    const today = new Date();
+    let targetDate = new Date();
+    
+    // Adjust the target date based on month offset
+    if (currentMonthOffset !== 0) {
+      targetDate = new Date(today.getFullYear(), today.getMonth() + currentMonthOffset, 1);
+      // Set to the last day of the target month if we're in the future
+      if (targetDate > today) {
+        targetDate = new Date(today.getFullYear(), today.getMonth() + currentMonthOffset + 1, 0);
       }
-      
-      return {
-        date: formattedDate,
-        fullDate: detail.Date,
-        value
-      };
+    }
+    
+    const currentMonth = targetDate.getMonth();
+    const currentYear = targetDate.getFullYear();
+    
+    // Get the last day of the target month or today if it's the current month
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+    const endDate = currentMonth === today.getMonth() && currentYear === today.getFullYear() 
+      ? today 
+      : lastDayOfMonth;
+    
+    // Create a map of date to value for easy lookup
+    const dateValueMap = new Map<string, number>();
+    
+    // Process the data and populate the map - filter out previous month's last day
+    data.Details.forEach(detail => {
+      const detailDate = new Date(detail.Date);
+      // Only include dates from the 1st of the target month onwards
+      if (detailDate >= new Date(currentYear, currentMonth, 1) && 
+          detailDate <= endDate) {
+        const dateKey = detail.Date.split('T')[0]; // Use YYYY-MM-DD as key
+        
+        let value = 0;
+        switch (selectedMetric) {
+          case 'orders':
+            value = detail.OrdersCount;
+            break;
+          case 'newUsers':
+            value = detail.NewUsersCount;
+            break;
+          case 'totalAmount':
+            value = detail.TotalAmount;
+            break;
+        }
+        
+        dateValueMap.set(dateKey, value);
+      }
     });
+    
+    // Generate an array of all days from 1st of the month to today
+    const result = [];
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    
+    // For each day from 1st to endDate (today or end of month)
+    for (let d = new Date(firstDay); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      const formattedDate = `${d.getDate()}/${d.getMonth() + 1}`;
+      
+      result.push({
+        date: formattedDate,
+        fullDate: dateKey,
+        value: dateValueMap.get(dateKey) || 0
+      });
+    }
+    
+    return result;
   }, [data, selectedMetric]);
 
   const maxChartValue = useMemo(() => {
@@ -132,15 +181,97 @@ const InsightsPage = () => {
     return [];
   }, [data]);
 
+  // Filter details for the selected month only
+  const currentMonthDetails = useMemo(() => {
+    if (!data?.Details || !Array.isArray(data.Details)) return [];
+    
+    const today = new Date();
+    const targetDate = new Date();
+    
+    // Adjust the target date based on month offset
+    if (currentMonthOffset !== 0) {
+      targetDate.setMonth(today.getMonth() + currentMonthOffset);
+    }
+    
+    const targetMonth = targetDate.getMonth();
+    const targetYear = targetDate.getFullYear();
+    
+    return data.Details.filter(detail => {
+      const detailDate = new Date(detail.Date);
+      return detailDate.getMonth() === targetMonth && 
+             detailDate.getFullYear() === targetYear;
+    });
+  }, [data, currentMonthOffset]);
+
+  // Calculate totals from filtered data
+  const currentMonthTotals = useMemo(() => {
+    const today = new Date();
+    const targetDate = new Date();
+    
+    // Adjust the target date based on month offset
+    if (currentMonthOffset !== 0) {
+      targetDate.setMonth(today.getMonth() + currentMonthOffset);
+    }
+    
+    const targetMonth = targetDate.getMonth();
+    const targetYear = targetDate.getFullYear();
+    
+    return currentMonthDetails.reduce((acc, detail) => {
+      const detailDate = new Date(detail.Date);
+      // Only include data from the target month and year
+      if (detailDate.getMonth() === targetMonth && detailDate.getFullYear() === targetYear) {
+        return {
+          orders: acc.orders + (detail.OrdersCount || 0),
+          newUsers: acc.newUsers + (detail.NewUsersCount || 0),
+          totalAmount: acc.totalAmount + (detail.TotalAmount || 0)
+        };
+      }
+      return acc;
+    }, { orders: 0, newUsers: 0, totalAmount: 0 });
+  }, [currentMonthDetails, currentMonthOffset, preset]);
+
+  // Get current month name and year for display
+  const currentMonthName = useMemo(() => {
+    const date = new Date();
+    if (currentMonthOffset !== 0) {
+      date.setMonth(date.getMonth() + currentMonthOffset);
+    }
+    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }, [currentMonthOffset]);
+
+  // Function to handle month navigation
+const navigateMonth = (direction: 'prev' | 'next') => {
+  setCurrentMonthOffset(prev => {
+    if (direction === 'next' && prev >= 0) return prev;
+    return direction === 'prev' ? prev - 1 : prev + 1;
+  });
+};
+
   const metricConfig = useMemo(() => {
     const configs = {
-      orders: { label: 'Orders Count', color: 'from-blue-600 to-indigo-500', value: data?.OrdersCount || 0 },
-      newUsers: { label: 'New Users', color: 'from-green-600 to-emerald-500', value: data?.NewUsersCount || 0 },
-      totalAmount: { label: 'Total Amount', color: 'from-purple-600 to-pink-500', value: data?.TotalAmount || 0 },
-      bestSelling: { label: 'Best Selling Items', color: 'from-amber-500 to-orange-500', value: data?.BestSellingItems?.length || 0 }
+      orders: { 
+        label: 'Orders Count', 
+        color: 'from-blue-600 to-indigo-500', 
+        value: preset === 'monthly' ? currentMonthTotals.orders : (data?.OrdersCount || 0) 
+      },
+      newUsers: { 
+        label: 'New Users', 
+        color: 'from-green-600 to-emerald-500', 
+        value: preset === 'monthly' ? currentMonthTotals.newUsers : (data?.NewUsersCount || 0) 
+      },
+      totalAmount: { 
+        label: 'Total Amount', 
+        color: 'from-purple-600 to-pink-500', 
+        value: preset === 'monthly' ? currentMonthTotals.totalAmount : (data?.TotalAmount || 0) 
+      },
+      bestSelling: { 
+        label: 'Best Selling Items', 
+        color: 'from-amber-500 to-orange-500', 
+        value: data?.BestSellingItems?.length || 0 
+      }
     };
     return configs[selectedMetric];
-  }, [selectedMetric, data]);
+  }, [selectedMetric, data, currentMonthTotals, preset]);
 
   const fetchInsights = useCallback(async () => {
     try {
@@ -169,12 +300,20 @@ const InsightsPage = () => {
             startDateParam = start.toISOString().split('T')[0];
             endDateParam = end;
             break;
-          case 'last30days':
-            const end30 = today.toISOString().split('T')[0];
-            const start30 = new Date(today);
-            start30.setDate(today.getDate() - 29);
-            startDateParam = start30.toISOString().split('T')[0];
-            endDateParam = end30;
+          case 'monthly':
+            const targetDate = new Date();
+            if (currentMonthOffset !== 0) {
+              targetDate.setMonth(today.getMonth() + currentMonthOffset);
+            }
+            const firstDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+            const lastDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+            
+            // If it's the current month, only go up to today, otherwise show full month
+            const isCurrentMonth = targetDate.getMonth() === today.getMonth() && 
+                                 targetDate.getFullYear() === today.getFullYear();
+            
+            startDateParam = firstDayOfMonth.toISOString().split('T')[0];
+            endDateParam = isCurrentMonth ? today.toISOString().split('T')[0] : lastDayOfMonth.toISOString().split('T')[0];
             break;
         }
         params.start = startDateParam!;
@@ -239,11 +378,11 @@ const InsightsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [preset, startDate, endDate, selectedMetric]);
+  }, [preset, startDate, endDate, selectedMetric, currentMonthOffset]);
 
   useEffect(() => {
     fetchInsights();
-  }, [fetchInsights]);
+  }, [fetchInsights, currentMonthOffset]);
 
   return (
     <ProtectedRoute>
@@ -333,7 +472,7 @@ const InsightsPage = () => {
           
           {preset === 'custom' && (!startDate || !endDate) && (
             <div className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              ⚠️ Please select both start and end dates for custom range
+              Warning: Please select both start and end dates for custom range
             </div>
           )}
         </form>
@@ -349,52 +488,82 @@ const InsightsPage = () => {
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
+                  <h2 className="text-lg font-medium text-gray-900">Analytics</h2>
+            
+                  {/* Month Navigation - Only show for Monthly view */}
+                  {preset === 'monthly' && (
+                    <div className="flex items-center space-x-4 ml-4">
+                      <button
+                        onClick={() => navigateMonth('prev')}
+                        className="p-1 rounded-full hover:bg-gray-100"
+                        title="Previous month"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      <span className="font-medium">{currentMonthName}</span>
+                      <button
+                        onClick={() => navigateMonth('next')}
+                        className={`p-1 rounded-full ${currentMonthOffset >= 0 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                        disabled={currentMonthOffset >= 0}
+                        title={currentMonthOffset >= 0 ? "Can't view future months" : "Next month"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-2 ml-auto">
                   <h3 className="text-base font-semibold text-gray-900">Select Metric</h3>
                   <p className="text-xs text-gray-500 mt-0.5">Choose which metric to display across all views</p>
                 </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedMetric('orders')}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-                      selectedMetric === 'orders'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-lg scale-105'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    📦 Orders
-                  </button>
-                  <button
-                    onClick={() => setSelectedMetric('newUsers')}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-                      selectedMetric === 'newUsers'
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-lg scale-105'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    👥 Users
-                  </button>
-                  <button
-                    onClick={() => setSelectedMetric('totalAmount')}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-                      selectedMetric === 'totalAmount'
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg scale-105'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    💰 Amount
-                  </button>
-                  <button
-                    onClick={() => setSelectedMetric('bestSelling')}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-                      selectedMetric === 'bestSelling'
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg scale-105'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    🏆 Best Sellers
-                  </button>
-                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button
+                  onClick={() => setSelectedMetric('orders')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                    selectedMetric === 'orders'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Orders
+                </button>
+                <button
+                  onClick={() => setSelectedMetric('newUsers')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                    selectedMetric === 'newUsers'
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Users
+                </button>
+                <button
+                  onClick={() => setSelectedMetric('totalAmount')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                    selectedMetric === 'totalAmount'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Amount
+                </button>
+                <button
+                  onClick={() => setSelectedMetric('bestSelling')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                    selectedMetric === 'bestSelling'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Best Sellers
+                </button>
               </div>
             </div>
 
@@ -409,9 +578,9 @@ const InsightsPage = () => {
                   <div className="text-sm opacity-80">Total for selected period</div>
                 </div>
                 <div className="text-6xl opacity-20">
-                  {selectedMetric === 'orders' && '📦'}
-                  {selectedMetric === 'newUsers' && '👥'}
-                  {selectedMetric === 'totalAmount' && '💰'}
+                  {selectedMetric === 'orders' && 'Orders'}
+                  {selectedMetric === 'newUsers' && 'Users'}
+                  {selectedMetric === 'totalAmount' && 'Amount'}
                 </div>
               </div>
             </div>

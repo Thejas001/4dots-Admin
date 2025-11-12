@@ -223,7 +223,7 @@ const OrderList = () => {
   return (
     <div className="max-w-7xl mx-auto">
       <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-6 sm:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400">
-        My Orders
+        Orders
       </h1>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 mb-6 sm:mb-8">
