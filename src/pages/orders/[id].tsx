@@ -470,7 +470,7 @@ const OrderDetail = () => {
                     <div><p className="text-gray-600 text-base sm:text-lg mb-1">Pincode</p><p className="text-black text-lg sm:text-xl">{currentOrder.UserAddress?.PinCode || '—'}</p></div>
                     <div><p className="text-gray-600 text-base sm:text-lg mb-1">Country</p><p className="text-black text-lg sm:text-xl">{currentOrder.UserAddress?.Country || '—'}</p></div>
                   </div>
-                  <div><p className="text-gray-600 text-base sm:text-lg mb-1">Phone Number</p><p className="text-black text-lg sm:text-xl">{currentOrder.UserAddress?.PhoneNumber || '—'}</p></div>
+                  <div><p className="text-gray-600 text-base sm:text-lg mb-1">Phone Number</p><p className="text-black text-lg sm:text-xl">{currentOrder.UserAddress?.PhoneNumber || currentOrder.PhoneNumber || '—'}</p></div>
                 </div>
               </div>
 
@@ -484,12 +484,6 @@ const OrderDetail = () => {
                     )?.AttributeValue;
                     const calculatedPrice = calculatedPriceStr ? parseFloat(calculatedPriceStr) : 0;
 
-                    const basePrice = item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price ?? 0) : (item.Price ?? 0);
-                    const baseTotal = basePrice * (item.Quantity ?? 1);
-                    const addonsTotal = (item.Addons ?? []).reduce((s: number, a: any) => s + ((a.AddonPrice ?? 0) * (a.NumberOfBooks ?? 1)), 0);
-                    const fallbackTotal = baseTotal + addonsTotal;
-                    const finalPrice = calculatedPrice > 0 ? calculatedPrice : fallbackTotal;
-
                     const comment = getDynamicAttr(item.DynamicAttributes, 'ProductComment');
                     const colorRange = getDynamicAttr(item.DynamicAttributes, 'ColorPrintRange');
                     const pageCount = getDynamicAttr(item.DynamicAttributes, 'PageCount');
@@ -497,6 +491,21 @@ const OrderDetail = () => {
                     const bwPages = getDynamicAttr(item.DynamicAttributes, 'TotalBwPageCount');
                     const copies = getDynamicAttr(item.DynamicAttributes, 'NumberOfCopies');
                     const numberOfCards = getDynamicAttr(item.DynamicAttributes, 'NumberOfCards');
+                    const posterBundleQuantity = getDynamicAttr(item.DynamicAttributes, 'PosterBundleQuantity');
+                    const dynamicQuantity = getDynamicAttr(item.DynamicAttributes, 'Quantity');
+                    const acrylicClockCount = getDynamicAttr(item.DynamicAttributes, 'TotalAcrylicWallClockCount');
+                    const templateName = getDynamicAttr(item.DynamicAttributes, 'TemplateName');
+
+                    const basePrice = item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price ?? 0) : (item.Price ?? 0);
+                    const actualQuantity = acrylicClockCount || dynamicQuantity || posterBundleQuantity || (item.Quantity ?? 1);
+                    // For acrylic wall clocks, the backend Price is already the total price, so don't multiply by quantity
+                    const baseTotal = acrylicClockCount ? basePrice : (basePrice * actualQuantity);
+                    const addonsTotal = (item.Addons ?? []).reduce((s: number, a: any) => s + ((a.AddonPrice ?? 0) * (a.NumberOfBooks ?? 1)), 0);
+                    const fallbackTotal = baseTotal + addonsTotal;
+                    const finalPrice = calculatedPrice > 0 ? calculatedPrice : fallbackTotal;
+
+                    // For acrylic wall clocks, the backend Price is actually the total price, so calculate actual unit price
+                    const displayUnitPrice = acrylicClockCount ? (basePrice / actualQuantity) : basePrice;
 
                     return (
                       <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
@@ -507,8 +516,9 @@ const OrderDetail = () => {
                             </h3>
 
                             <div className="flex flex-wrap gap-4 text-base">
-                              <span className="text-gray-600">Qty: <strong>{item.Quantity}</strong></span>
-                              <span className="text-gray-600">Unit Price: <strong>₹{basePrice.toFixed(2)}</strong></span>
+                              <span className="text-gray-600">Qty: <strong>{acrylicClockCount || dynamicQuantity || posterBundleQuantity || item.Quantity}</strong></span>
+                              <span className="text-gray-600">Unit Price: <strong>₹{displayUnitPrice.toFixed(2)}</strong></span>
+                              {templateName && <span className="text-gray-600">Template: <strong>{templateName}</strong></span>}
                             </div>
 
                             {comment && (
@@ -520,12 +530,19 @@ const OrderDetail = () => {
 
                             {item.Attributes?.length > 0 && (
                               <div className="text-sm space-y-1">
-                                {item.Attributes.map((a: any, i: number) => (
+                                {item.Attributes.filter((a: any) => a.AttributeName !== 'PosterQuantity').map((a: any, i: number) => (
                                   <div key={i} className="flex justify-between">
                                     <span className="text-gray-600">{a.AttributeName}:</span>
                                     <span className="font-medium">{a.AttributeValue}</span>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            {posterBundleQuantity && (
+                              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                                <p className="font-semibold text-blue-800 text-sm">Bundle Quantity Information</p>
+                                <p className="text-blue-900 text-sm">This product is sold in bundles - 1 bundle equals 1000 units. Customer ordered {posterBundleQuantity} bundle(s) totaling {posterBundleQuantity * 1000} units.</p>
                               </div>
                             )}
 
