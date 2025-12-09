@@ -657,10 +657,10 @@ const OrderDetail = () => {
               <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 lg:p-8">
                 <h2 className="text-xl sm:text-2xl font-bold text-black mb-6">Order Summary</h2>
                 <div className="space-y-4">
-                  <div className="flex justify-between"><p className="text-gray-600 text-base sm:text-lg">Subtotal</p><p className="text-black text-lg sm:text-xl font-semibold">₹{currentOrder.TotalAmount}</p></div>
-                  <div className="flex justify-between"><p className="text-gray-600 text-base sm:text-lg">Shipping</p><p className="text-black text-lg sm:text-xl font-semibold">₹0.00</p></div>
+                  <div className="flex justify-between"><p className="text-gray-600 text-base sm:text-lg">Subtotal</p><p className="text-black text-lg sm:text-xl font-semibold">₹{(currentOrder.TotalAmount - (currentOrder.DeliveryCharge ?? 0)).toFixed(2)}</p></div>
+                  <div className="flex justify-between"><p className="text-gray-600 text-base sm:text-lg">Shipping</p><p className="text-black text-lg sm:text-xl font-semibold">{(currentOrder.DeliveryCharge ?? 0) > 0 ? `₹${(currentOrder.DeliveryCharge ?? 0).toFixed(2)}` : 'Free'}</p></div>
                   <div className="border-t border-gray-200 pt-4 mt-4">
-                    <div className="flex justify-between"><p className="text-black text-lg sm:text-xl font-bold">Total</p><p className="text-black text-xl sm:text-2xl font-bold">₹{currentOrder.TotalAmount}</p></div>
+                    <div className="flex justify-between"><p className="text-black text-lg sm:text-xl font-bold">Total</p><p className="text-black text-xl sm:text-2xl font-bold">₹{currentOrder.TotalAmount.toFixed(2)}</p></div>
                   </div>
                 </div>
               </div>

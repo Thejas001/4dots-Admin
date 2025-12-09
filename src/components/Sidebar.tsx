@@ -22,7 +22,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       ),
     },
     {
-      name: 'My Orders',
+      name: 'Orders',
       href: '/orders',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
         <div className="p-4 border-t border-gray-700 bg-gradient-to-r from-gray-800 to-gray-900">
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-1">
-              © 2024 4dots Admin
+              © {new Date().getFullYear()} 4dots Admin
             </p>
             <div className="flex items-center justify-center gap-1">
               <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
