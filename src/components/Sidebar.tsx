@@ -44,6 +44,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       ),
     },
     {
+      name: 'Coupons',
+      href: '/coupons',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h6a2 2 0 012 2v1a2 2 0 100 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5h4a2 2 0 012 2v1a2 2 0 100 4v1a2 2 0 01-2 2h-4" />
+        </svg>
+      ),
+    },
+    {
       name: 'Add Custom Product',
       href: '/add-custom-product',
       icon: (
@@ -111,7 +121,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navigationItems.map((item) => {
             const isActive = router.pathname === item.href || 
-                            (item.href === '/orders' && router.pathname.startsWith('/orders'));
+                            (item.href === '/orders' && router.pathname.startsWith('/orders')) ||
+                            (item.href === '/coupons' && router.pathname.startsWith('/coupons'));
             
             return (
               <Link
