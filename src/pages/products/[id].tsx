@@ -188,6 +188,44 @@ const recoverConditionsFromRuleName = (
   return recovered;
 };
 
+const recoverConditionsFromOrdinalIds = (
+  conditions: Array<{ attributeId: number | ''; attributeValueId: number | '' }>,
+  availableAttributes: SavedAttribute[],
+): Array<{ attributeId: number | ''; attributeValueId: number | '' }> => {
+  const recovered: Array<{ attributeId: number | ''; attributeValueId: number | '' }> = [];
+
+  for (const condition of conditions) {
+    if (typeof condition.attributeId !== 'number' || condition.attributeId <= 0) continue;
+    if (typeof condition.attributeValueId !== 'number' || condition.attributeValueId <= 0) continue;
+
+    const attributeById = availableAttributes.find((item) => item.AttributeID === condition.attributeId);
+    if (attributeById) {
+      const valueById = attributeById.AttributeValues.find((value) => value.ValueID === condition.attributeValueId);
+      if (valueById) {
+        recovered.push({
+          attributeId: attributeById.AttributeID,
+          attributeValueId: valueById.ValueID,
+        });
+        continue;
+      }
+    }
+
+    // Backward-compatibility path: some migrated rules use 1-based ordinals
+    // for attribute/value instead of persisted DB IDs.
+    const attributeByOrdinal = availableAttributes[condition.attributeId - 1];
+    if (!attributeByOrdinal) continue;
+    const valueByOrdinal = attributeByOrdinal.AttributeValues[condition.attributeValueId - 1];
+    if (!valueByOrdinal) continue;
+
+    recovered.push({
+      attributeId: attributeByOrdinal.AttributeID,
+      attributeValueId: valueByOrdinal.ValueID,
+    });
+  }
+
+  return recovered;
+};
+
 const readNumericField = (source: any, primaryKeys: string[], normalizedKey: string): number => {
   for (const key of primaryKeys) {
     const raw = source?.[key];
@@ -328,6 +366,10 @@ export default function EditProductPage() {
           rule?.RuleName ?? rule?.ruleName,
           availableAttributes,
         );
+        const ordinalRecoveredConditions = recoverConditionsFromOrdinalIds(
+          mappedConditions,
+          availableAttributes,
+        );
 
         return {
           conditions:
@@ -335,6 +377,8 @@ export default function EditProductPage() {
               ? mappedConditions
               : recoveredConditions.length > 0
                 ? recoveredConditions
+                : ordinalRecoveredConditions.length > 0
+                  ? ordinalRecoveredConditions
                 : mappedConditions.length > 0
                   ? mappedConditions
                   : [{ attributeId: '', attributeValueId: '' }],
@@ -571,6 +615,15 @@ export default function EditProductPage() {
   };
 
   const removeAttributeName = (name: string) => {
+    const savedAttribute = getSavedAttributeByName(name);
+    if (savedAttribute && isAttributeUsedInRules(savedAttribute.AttributeID)) {
+      setError(
+        `Cannot remove attribute "${name}" because it is used in pricing rules. Remove or update related pricing conditions first.`,
+      );
+      return;
+    }
+
+    setError(null);
     setAttributes((prev) => prev.filter((attribute) => attribute.name !== name));
     if (selectedAttributeName === name) {
       const next = attributes.find((attribute) => attribute.name !== name)?.name || '';
@@ -594,6 +647,22 @@ export default function EditProductPage() {
 
   const removeValueFromSelectedAttribute = (value: string) => {
     if (!selectedAttributeName) return;
+    const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+    const savedValue = savedAttribute?.AttributeValues.find(
+      (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+    );
+    if (
+      savedAttribute &&
+      savedValue &&
+      isAttributeValueUsedInRules(savedAttribute.AttributeID, savedValue.ValueID)
+    ) {
+      setError(
+        `Cannot remove value "${selectedAttributeName}=${value}" because it is used in pricing rules. Remove or update related pricing conditions first.`,
+      );
+      return;
+    }
+
+    setError(null);
     setAttributes((prev) =>
       prev.map((attribute) =>
         attribute.name === selectedAttributeName
@@ -609,6 +678,38 @@ export default function EditProductPage() {
     if (attributes.length === 0) {
       setError('Add at least one attribute.');
       return;
+    }
+
+    for (const savedAttribute of savedAttributes) {
+      const editedAttribute = attributes.find(
+        (attribute) =>
+          attribute.name.trim().toLowerCase() === savedAttribute.AttributeName.trim().toLowerCase(),
+      );
+
+      if (!editedAttribute) {
+        if (isAttributeUsedInRules(savedAttribute.AttributeID)) {
+          setError(
+            `Cannot save changes. Attribute "${savedAttribute.AttributeName}" is used in pricing rules.`,
+          );
+          return;
+        }
+        continue;
+      }
+
+      const editedValueSet = new Set(
+        editedAttribute.values.map((value) => value.trim().toLowerCase()).filter(Boolean),
+      );
+      for (const savedValue of savedAttribute.AttributeValues) {
+        const savedValueKey = savedValue.ValueName.trim().toLowerCase();
+        if (!editedValueSet.has(savedValueKey)) {
+          if (isAttributeValueUsedInRules(savedAttribute.AttributeID, savedValue.ValueID)) {
+            setError(
+              `Cannot save changes. Value "${savedAttribute.AttributeName}=${savedValue.ValueName}" is used in pricing rules.`,
+            );
+            return;
+          }
+        }
+      }
     }
 
     const payloadAttributes = attributes
@@ -642,6 +743,42 @@ export default function EditProductPage() {
 
   const getAttributeById = (id: number | '') =>
     savedAttributes.find((attribute) => attribute.AttributeID === id);
+
+  const getSavedAttributeByName = (name: string) =>
+    savedAttributes.find(
+      (attribute) => attribute.AttributeName.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+
+  const isAttributeUsedInRules = (attributeId: number) =>
+    rules.some((rule) => rule.conditions.some((condition) => condition.attributeId === attributeId));
+
+  const isAttributeValueUsedInRules = (attributeId: number, attributeValueId: number) =>
+    rules.some((rule) =>
+      rule.conditions.some(
+        (condition) =>
+          condition.attributeId === attributeId && condition.attributeValueId === attributeValueId,
+      ),
+    );
+
+  const getAttributeRuleUsageCount = (attributeId: number) =>
+    rules.reduce(
+      (count, rule) =>
+        count + (rule.conditions.some((condition) => condition.attributeId === attributeId) ? 1 : 0),
+      0,
+    );
+
+  const getAttributeValueRuleUsageCount = (attributeId: number, attributeValueId: number) =>
+    rules.reduce(
+      (count, rule) =>
+        count +
+        (rule.conditions.some(
+          (condition) =>
+            condition.attributeId === attributeId && condition.attributeValueId === attributeValueId,
+        )
+          ? 1
+          : 0),
+      0,
+    );
 
   const updateRule = (index: number, patch: Partial<RuleDraft>) => {
     setRules((prev) => prev.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
@@ -926,8 +1063,31 @@ export default function EditProductPage() {
               <div className="space-y-2">
                 {attributes.map((attribute) => (
                   <div key={attribute.name} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                    <button type="button" onClick={() => setSelectedAttributeName(attribute.name)} className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}>{attribute.name}</button>
-                    <button type="button" onClick={() => removeAttributeName(attribute.name)} className="text-xs font-medium text-red-700 hover:text-red-800">Remove</button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setSelectedAttributeName(attribute.name)} className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}>{attribute.name}</button>
+                      {(() => {
+                        const savedAttribute = getSavedAttributeByName(attribute.name);
+                        const usageCount = savedAttribute ? getAttributeRuleUsageCount(savedAttribute.AttributeID) : 0;
+                        if (usageCount <= 0) return null;
+                        return (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttributeName(attribute.name)}
+                      className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                      disabled={(() => {
+                        const savedAttribute = getSavedAttributeByName(attribute.name);
+                        if (!savedAttribute) return false;
+                        return getAttributeRuleUsageCount(savedAttribute.AttributeID) > 0;
+                      })()}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
               </div>
@@ -947,8 +1107,40 @@ export default function EditProductPage() {
               <div className="space-y-2">
                 {selectedAttributeEditor?.values.map((value) => (
                   <div key={value} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                    <span className="text-sm text-gray-700">{value}</span>
-                    <button type="button" onClick={() => removeValueFromSelectedAttribute(value)} className="text-xs font-medium text-red-700 hover:text-red-800">Remove</button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{value}</span>
+                      {(() => {
+                        const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                        const savedValue = savedAttribute?.AttributeValues.find(
+                          (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                        );
+                        const usageCount =
+                          savedAttribute && savedValue
+                            ? getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID)
+                            : 0;
+                        if (usageCount <= 0) return null;
+                        return (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeValueFromSelectedAttribute(value)}
+                      className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                      disabled={(() => {
+                        const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                        const savedValue = savedAttribute?.AttributeValues.find(
+                          (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                        );
+                        if (!savedAttribute || !savedValue) return false;
+                        return getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID) > 0;
+                      })()}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
               </div>

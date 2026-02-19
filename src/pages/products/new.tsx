@@ -349,6 +349,15 @@ export default function NewProductPage() {
   };
 
   const removeAttributeName = (name: string) => {
+    const savedAttribute = getSavedAttributeByName(name);
+    if (savedAttribute && isAttributeUsedInRules(savedAttribute.AttributeID)) {
+      setError(
+        `Cannot remove attribute "${name}" because it is used in pricing rules. Remove or update related pricing conditions first.`,
+      );
+      return;
+    }
+
+    setError(null);
     setAttributes((prev) => prev.filter((attribute) => attribute.name !== name));
     if (selectedAttributeName === name) {
       const next = attributes.find((attribute) => attribute.name !== name)?.name || '';
@@ -400,6 +409,22 @@ export default function NewProductPage() {
 
   const removeValueFromSelectedAttribute = (value: string) => {
     if (!selectedAttributeName) return;
+    const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+    const savedValue = savedAttribute?.AttributeValues.find(
+      (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+    );
+    if (
+      savedAttribute &&
+      savedValue &&
+      isAttributeValueUsedInRules(savedAttribute.AttributeID, savedValue.ValueID)
+    ) {
+      setError(
+        `Cannot remove value "${selectedAttributeName}=${value}" because it is used in pricing rules. Remove or update related pricing conditions first.`,
+      );
+      return;
+    }
+
+    setError(null);
     setAttributes((prev) =>
       prev.map((attribute) =>
         attribute.name === selectedAttributeName
@@ -421,6 +446,38 @@ export default function NewProductPage() {
     if (attributes.length === 0) {
       setError('Add at least one attribute.');
       return;
+    }
+
+    for (const savedAttribute of savedAttributes) {
+      const editedAttribute = attributes.find(
+        (attribute) =>
+          attribute.name.trim().toLowerCase() === savedAttribute.AttributeName.trim().toLowerCase(),
+      );
+
+      if (!editedAttribute) {
+        if (isAttributeUsedInRules(savedAttribute.AttributeID)) {
+          setError(
+            `Cannot save changes. Attribute "${savedAttribute.AttributeName}" is used in pricing rules.`,
+          );
+          return;
+        }
+        continue;
+      }
+
+      const editedValueSet = new Set(
+        editedAttribute.values.map((value) => value.trim().toLowerCase()).filter(Boolean),
+      );
+      for (const savedValue of savedAttribute.AttributeValues) {
+        const savedValueKey = savedValue.ValueName.trim().toLowerCase();
+        if (!editedValueSet.has(savedValueKey)) {
+          if (isAttributeValueUsedInRules(savedAttribute.AttributeID, savedValue.ValueID)) {
+            setError(
+              `Cannot save changes. Value "${savedAttribute.AttributeName}=${savedValue.ValueName}" is used in pricing rules.`,
+            );
+            return;
+          }
+        }
+      }
     }
 
     const duplicateNames = attributes
@@ -459,6 +516,42 @@ export default function NewProductPage() {
 
   const getAttributeById = (id: number | '') =>
     savedAttributes.find((attribute) => attribute.AttributeID === id);
+
+  const getSavedAttributeByName = (name: string) =>
+    savedAttributes.find(
+      (attribute) => attribute.AttributeName.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+
+  const isAttributeUsedInRules = (attributeId: number) =>
+    rules.some((rule) => rule.conditions.some((condition) => condition.attributeId === attributeId));
+
+  const isAttributeValueUsedInRules = (attributeId: number, attributeValueId: number) =>
+    rules.some((rule) =>
+      rule.conditions.some(
+        (condition) =>
+          condition.attributeId === attributeId && condition.attributeValueId === attributeValueId,
+      ),
+    );
+
+  const getAttributeRuleUsageCount = (attributeId: number) =>
+    rules.reduce(
+      (count, rule) =>
+        count + (rule.conditions.some((condition) => condition.attributeId === attributeId) ? 1 : 0),
+      0,
+    );
+
+  const getAttributeValueRuleUsageCount = (attributeId: number, attributeValueId: number) =>
+    rules.reduce(
+      (count, rule) =>
+        count +
+        (rule.conditions.some(
+          (condition) =>
+            condition.attributeId === attributeId && condition.attributeValueId === attributeValueId,
+        )
+          ? 1
+          : 0),
+      0,
+    );
 
   const updateRule = (index: number, patch: Partial<RuleDraft>) => {
     setRules((prev) => prev.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
