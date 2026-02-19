@@ -1,7 +1,7 @@
 // Global API Configuration
 export const API_CONFIG = {
   // Base URL for the API - change this to switch between environments
-  BASE_URL: 'https://fourdotsapp.azurewebsites.net',
+  BASE_URL: 'https://localhost:7049',
 
   
   // API endpoints
@@ -36,7 +36,7 @@ export const API_CONFIG = {
   
   // Environment-specific configurations (optional - for future use)
   ENVIRONMENTS: {
-    DEVELOPMENT: 'https://localhost:5001',
+    DEVELOPMENT: 'https://localhost:7049',
     STAGING: 'https://fourdotsapp.azurewebsites.net',
     PRODUCTION: 'https://fourdotsapp-prod.azurewebsites.net',
   }
