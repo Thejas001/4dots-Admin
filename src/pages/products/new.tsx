@@ -48,6 +48,9 @@ type MetaConfigResponse = {
     IsUploadMandatory?: boolean;
     MinUploads?: number | null;
     MaxUploads?: number | null;
+    EnableOrderQuantity?: boolean;
+    MinOrderQuantity?: number | null;
+    MaxOrderQuantity?: number | null;
     EnableCustomDescription?: boolean;
     IsCustomDescriptionRequired?: boolean;
     CustomDescriptionLabel?: string | null;
@@ -111,6 +114,11 @@ const normalizeRuleToken = (value: string): string =>
     .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '') || 'UNSPECIFIED';
 
+const isQuantityLikeInputKey = (value: string): boolean => {
+  const normalized = (value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return normalized === 'quantity' || normalized === 'qty' || normalized === 'orderquantity' || normalized === 'copies' || normalized === 'copycount';
+};
+
 const buildUniqueRuleName = (tokens: string[], usedNames: Set<string>): string => {
   const base = `RULE_${tokens.map(normalizeRuleToken).join('__') || 'UNSPECIFIED'}`;
   if (!usedNames.has(base)) {
@@ -158,7 +166,7 @@ export default function NewProductPage() {
   const [replaceRules, setReplaceRules] = useState(true);
   const [priceType, setPriceType] = useState(0);
   const [multiplierMode, setMultiplierMode] = useState<'manual' | 'upload_count'>('manual');
-  const [multiplierInputKey, setMultiplierInputKey] = useState('Quantity');
+  const [multiplierInputKey, setMultiplierInputKey] = useState('Factor');
   const [minMultiplier, setMinMultiplier] = useState('');
   const [maxMultiplier, setMaxMultiplier] = useState('');
 
@@ -178,6 +186,9 @@ export default function NewProductPage() {
   const [isUploadMandatory, setIsUploadMandatory] = useState(false);
   const [minUploads, setMinUploads] = useState('');
   const [maxUploads, setMaxUploads] = useState('');
+  const [enableOrderQuantity, setEnableOrderQuantity] = useState(false);
+  const [minOrderQuantity, setMinOrderQuantity] = useState('');
+  const [maxOrderQuantity, setMaxOrderQuantity] = useState('');
   const [enableCustomDescription, setEnableCustomDescription] = useState(false);
   const [isCustomDescriptionRequired, setIsCustomDescriptionRequired] = useState(false);
   const [customDescriptionLabel, setCustomDescriptionLabel] = useState('');
@@ -245,6 +256,17 @@ export default function NewProductPage() {
       setIsUploadMandatory(Boolean(upload?.IsUploadMandatory));
       setMinUploads(upload?.MinUploads !== undefined && upload?.MinUploads !== null ? String(upload.MinUploads) : '');
       setMaxUploads(upload?.MaxUploads !== undefined && upload?.MaxUploads !== null ? String(upload.MaxUploads) : '');
+      setEnableOrderQuantity(Boolean(upload?.EnableOrderQuantity));
+      setMinOrderQuantity(
+        upload?.MinOrderQuantity !== undefined && upload?.MinOrderQuantity !== null
+          ? String(upload.MinOrderQuantity)
+          : '',
+      );
+      setMaxOrderQuantity(
+        upload?.MaxOrderQuantity !== undefined && upload?.MaxOrderQuantity !== null
+          ? String(upload.MaxOrderQuantity)
+          : '',
+      );
       setEnableCustomDescription(Boolean(upload?.EnableCustomDescription));
       setIsCustomDescriptionRequired(Boolean(upload?.IsCustomDescriptionRequired));
       setCustomDescriptionLabel(typeof upload?.CustomDescriptionLabel === 'string' ? upload.CustomDescriptionLabel : '');
@@ -709,6 +731,10 @@ export default function NewProductPage() {
       setError('Multiplier input key is required for non-flat price types.');
       return;
     }
+    if (requiresMultiplier && multiplierMode === 'manual' && isQuantityLikeInputKey(trimmedManualInputKey)) {
+      setError('Use Upload Policy order quantity for copies. Variable factor input key cannot be Quantity/Qty.');
+      return;
+    }
 
     if (requiresMultiplier && multiplierMode === 'upload_count') {
       if (uploadMax === null || Number.isNaN(uploadMax) || uploadMax <= 0) {
@@ -886,6 +912,8 @@ export default function NewProductPage() {
 
     const minValue = minUploads.trim() === '' ? null : Number(minUploads);
     const maxValue = maxUploads.trim() === '' ? null : Number(maxUploads);
+    const minOrderValue = minOrderQuantity.trim() === '' ? null : Number(minOrderQuantity);
+    const maxOrderValue = maxOrderQuantity.trim() === '' ? null : Number(maxOrderQuantity);
 
     if (isUploadMandatory) {
       if (minValue === null || maxValue === null) {
@@ -911,6 +939,21 @@ export default function NewProductPage() {
       return;
     }
 
+    if (enableOrderQuantity) {
+      if (minOrderValue === null || maxOrderValue === null) {
+        setError('Min and Max order quantity are required when order quantity is enabled.');
+        return;
+      }
+      if (minOrderValue < 1) {
+        setError('Minimum order quantity must be at least 1.');
+        return;
+      }
+      if (maxOrderValue < minOrderValue) {
+        setError('Maximum order quantity must be greater than or equal to minimum order quantity.');
+        return;
+      }
+    }
+
     setSavingMeta(true);
     try {
       const payload = {
@@ -918,6 +961,9 @@ export default function NewProductPage() {
           IsUploadMandatory: isUploadMandatory,
           MinUploads: minValue,
           MaxUploads: maxValue,
+          EnableOrderQuantity: enableOrderQuantity,
+          MinOrderQuantity: enableOrderQuantity ? minOrderValue : null,
+          MaxOrderQuantity: enableOrderQuantity ? maxOrderValue : null,
           EnableCustomDescription: enableCustomDescription,
           IsCustomDescriptionRequired: enableCustomDescription && isCustomDescriptionRequired,
           CustomDescriptionLabel: enableCustomDescription ? customDescriptionLabel.trim() || null : null,
@@ -1300,10 +1346,10 @@ export default function NewProductPage() {
 
           {priceType !== 0 ? (
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-800">Multiplier Source</p>
+              <p className="text-sm font-medium text-gray-800">Variable Factor Source</p>
               <p className="text-xs text-gray-600">
-                This decides how many items to charge for. Example: if price is 100 each and value is 3, total is 300.
-                Choose <span className="font-medium">Number of uploads</span> when each uploaded file should count as one item.
+                This is an additional factor beyond order quantity. Example: unit 100, order qty 2, factor 3 = total 600.
+                Use <span className="font-medium">Number of uploads</span> when each uploaded file should add to pricing.
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -1313,7 +1359,7 @@ export default function NewProductPage() {
                     onChange={() => setMultiplierMode('manual')}
                     disabled={!canConfigurePricing || !hasPricingAttributes}
                   />
-                  Manual input
+                  Manual factor
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1333,13 +1379,16 @@ export default function NewProductPage() {
                     <input
                       value={multiplierInputKey}
                       onChange={(e) => setMultiplierInputKey(e.target.value)}
-                      placeholder="Quantity"
+                      placeholder="Pages / Area / Factor"
                       disabled={!canConfigurePricing || !hasPricingAttributes}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                     />
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      Do not use Quantity here. Order quantity is configured in Upload Policy.
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Min Multiplier</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Min Factor</label>
                     <input
                       type="number"
                       value={minMultiplier}
@@ -1350,7 +1399,7 @@ export default function NewProductPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Multiplier</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Factor</label>
                     <input
                       type="number"
                       value={maxMultiplier}
@@ -1363,7 +1412,7 @@ export default function NewProductPage() {
                 </div>
               ) : (
                 <div className="text-xs text-gray-700">
-                  Uses upload count from meta config as multiplier key <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
+                  Uses upload count from meta config as factor key <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
                   Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
                   <span className="font-semibold">{maxUploads || 'not set'}</span>.
                 </div>
@@ -1600,6 +1649,46 @@ export default function NewProductPage() {
                 disabled={!canConfigureMeta}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
               />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={enableOrderQuantity}
+                onChange={(e) => setEnableOrderQuantity(e.target.checked)}
+                disabled={!canConfigureMeta}
+                className="rounded border-gray-300"
+              />
+              Allow customer to choose order quantity on storefront
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Minimum order quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={minOrderQuantity}
+                  onChange={(e) => setMinOrderQuantity(e.target.value)}
+                  disabled={!canConfigureMeta || !enableOrderQuantity}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Maximum order quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={maxOrderQuantity}
+                  onChange={(e) => setMaxOrderQuantity(e.target.value)}
+                  disabled={!canConfigureMeta || !enableOrderQuantity}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="10"
+                />
+              </div>
             </div>
           </div>
 
