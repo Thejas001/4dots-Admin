@@ -64,6 +64,10 @@ type MetaConfigResponse = {
     IsUploadMandatory?: boolean;
     MinUploads?: number | null;
     MaxUploads?: number | null;
+    EnableCustomDescription?: boolean;
+    IsCustomDescriptionRequired?: boolean;
+    CustomDescriptionLabel?: string | null;
+    CustomDescriptionPlaceholder?: string | null;
     AllowedDocumentTypeIds?: number[];
   };
   InfoItems?: Array<{
@@ -100,13 +104,6 @@ const PRICING_STRATEGIES = [{ value: 0, label: 'Generic Matrix' }];
 const UI_MODES = [
   { value: 1, label: 'Dynamic' },
   { value: 0, label: 'Dedicated' },
-];
-
-const PRICE_TYPES = [
-  { value: 0, label: 'Flat' },
-  { value: 1, label: 'Per Unit' },
-  { value: 2, label: 'Per Area' },
-  { value: 3, label: 'Per Page' },
 ];
 
 const createEmptyRule = (index: number): RuleDraft => ({
@@ -293,6 +290,10 @@ export default function EditProductPage() {
   const [isUploadMandatory, setIsUploadMandatory] = useState(false);
   const [minUploads, setMinUploads] = useState('');
   const [maxUploads, setMaxUploads] = useState('');
+  const [enableCustomDescription, setEnableCustomDescription] = useState(false);
+  const [isCustomDescriptionRequired, setIsCustomDescriptionRequired] = useState(false);
+  const [customDescriptionLabel, setCustomDescriptionLabel] = useState('');
+  const [customDescriptionPlaceholder, setCustomDescriptionPlaceholder] = useState('');
   const [allowedDocumentTypeIds, setAllowedDocumentTypeIds] = useState<number[]>([]);
   const [infoItems, setInfoItems] = useState<InfoItemDraft[]>([
     { key: 'info-1', title: '', value: '', sortOrder: '1', isActive: true },
@@ -427,6 +428,10 @@ export default function EditProductPage() {
       setIsUploadMandatory(Boolean(upload?.IsUploadMandatory));
       setMinUploads(upload?.MinUploads !== undefined && upload?.MinUploads !== null ? String(upload.MinUploads) : '');
       setMaxUploads(upload?.MaxUploads !== undefined && upload?.MaxUploads !== null ? String(upload.MaxUploads) : '');
+      setEnableCustomDescription(Boolean(upload?.EnableCustomDescription));
+      setIsCustomDescriptionRequired(Boolean(upload?.IsCustomDescriptionRequired));
+      setCustomDescriptionLabel(typeof upload?.CustomDescriptionLabel === 'string' ? upload.CustomDescriptionLabel : '');
+      setCustomDescriptionPlaceholder(typeof upload?.CustomDescriptionPlaceholder === 'string' ? upload.CustomDescriptionPlaceholder : '');
       setAllowedDocumentTypeIds(
         Array.isArray(upload?.AllowedDocumentTypeIds) ? upload?.AllowedDocumentTypeIds ?? [] : [],
       );
@@ -781,6 +786,11 @@ export default function EditProductPage() {
     () => savedAttributes.filter((attribute) => attribute.AffectsPricing),
     [savedAttributes],
   );
+  const nonPricingAttributes = useMemo(
+    () => savedAttributes.filter((attribute) => !attribute.AffectsPricing),
+    [savedAttributes],
+  );
+  const hasPricingAttributes = pricingAttributes.length > 0;
 
   const getSavedAttributeByName = (name: string) =>
     savedAttributes.find(
@@ -876,6 +886,29 @@ export default function EditProductPage() {
   const handleSavePricing = async () => {
     setError(null);
     setPricingMessage(null);
+    if (savedAttributes.length === 0) {
+      setError('Save attributes first before configuring pricing.');
+      return;
+    }
+    if (!hasPricingAttributes) {
+      setSavingPricing(true);
+      try {
+        await api.put(`/api/products/${productId}/pricing-config`, {
+          PricingStrategy: effectivePricingStrategy,
+          ReplaceRules: true,
+          InputDefinitions: [],
+          Rules: [],
+        });
+        setPricingMessage('No pricing attributes configured. Pricing rules were cleared/skipped.');
+        await loadProduct();
+      } catch (err: any) {
+        const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
+        setError(apiMessage || err?.message || 'Failed to update pricing configuration.');
+      } finally {
+        setSavingPricing(false);
+      }
+      return;
+    }
     const validRules = rules.filter(
       (rule) =>
         rule.unitPrice !== '' &&
@@ -897,6 +930,22 @@ export default function EditProductPage() {
       setError('A rule cannot contain the same attribute more than once.');
       return;
     }
+    const pricingAttributeIdSet = new Set(pricingAttributes.map((attribute) => attribute.AttributeID));
+    const hasNonPricingCondition = validRules.some((rule) =>
+      rule.conditions.some((condition) => !pricingAttributeIdSet.has(Number(condition.attributeId))),
+    );
+    if (hasNonPricingCondition) {
+      setError('Pricing rules can only use attributes marked as "Affects pricing".');
+      return;
+    }
+
+    const hasUnsupportedPriceType = validRules.some((rule) => Number(rule.priceType) !== 0);
+    if (hasUnsupportedPriceType) {
+      setError(
+        'Per Unit/Area/Page pricing requires Multiplier Input Key and input definitions. This screen currently supports Flat pricing only.',
+      );
+      return;
+    }
 
     setSavingPricing(true);
     try {
@@ -913,7 +962,7 @@ export default function EditProductPage() {
         });
         return {
           RuleName: buildUniqueRuleName(ruleNameTokens, usedRuleNames),
-          PriceType: Number(rule.priceType),
+          PriceType: 0,
           UnitPrice: Number(rule.unitPrice),
           MultiplierInputKey: null,
           MinMultiplier: null,
@@ -1003,6 +1052,11 @@ export default function EditProductPage() {
       }
     }
 
+    if (isCustomDescriptionRequired && !enableCustomDescription) {
+      setError('Enable custom description before marking it as required.');
+      return;
+    }
+
     setSavingMeta(true);
     try {
       const payload = {
@@ -1010,6 +1064,10 @@ export default function EditProductPage() {
           IsUploadMandatory: isUploadMandatory,
           MinUploads: minValue,
           MaxUploads: maxValue,
+          EnableCustomDescription: enableCustomDescription,
+          IsCustomDescriptionRequired: enableCustomDescription && isCustomDescriptionRequired,
+          CustomDescriptionLabel: enableCustomDescription ? customDescriptionLabel.trim() || null : null,
+          CustomDescriptionPlaceholder: enableCustomDescription ? customDescriptionPlaceholder.trim() || null : null,
           AllowedDocumentTypeIds: allowedDocumentTypeIds,
         },
         InfoItems: toMetaInfoPayload(infoItems),
@@ -1210,6 +1268,17 @@ export default function EditProductPage() {
 
         <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Pricing Rules</h2>
+          <p className="text-sm text-gray-600">
+            Configure pricing only with attributes marked as pricing-relevant.
+          </p>
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
+            Pricing attributes: {pricingAttributes.length} | Non-pricing attributes: {nonPricingAttributes.length}
+          </div>
+          {!hasPricingAttributes ? (
+            <p className="text-sm text-amber-700">
+              No pricing attributes are configured. You can skip pricing rules for this product.
+            </p>
+          ) : null}
           <div className="flex items-center gap-2">
             <input id="replace-rules" type="checkbox" checked={replaceRules} onChange={(e) => setReplaceRules(e.target.checked)} className="rounded border-gray-300" />
             <label htmlFor="replace-rules" className="text-sm text-gray-700">Replace existing rules on save</label>
@@ -1217,7 +1286,7 @@ export default function EditProductPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
-              <button type="button" onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">+ Add Rule</button>
+              <button type="button" onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])} disabled={!hasPricingAttributes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">+ Add Rule</button>
             </div>
             {rules.map((rule, index) => {
               const ruleNameTokens = rule.conditions
@@ -1254,6 +1323,7 @@ export default function EditProductPage() {
                               })
                             }
                             className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                            disabled={!hasPricingAttributes}
                           >
                             <option value="">Attribute</option>
                             {pricingAttributes.map((attribute) => (
@@ -1270,7 +1340,7 @@ export default function EditProductPage() {
                               })
                             }
                             className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                            disabled={condition.attributeId === ''}
+                            disabled={!hasPricingAttributes || condition.attributeId === ''}
                           >
                             <option value="">Value</option>
                             {valueOptions.map((value) => (
@@ -1294,33 +1364,26 @@ export default function EditProductPage() {
                       type="button"
                       onClick={() => addConditionToRule(index)}
                       className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      disabled={!hasPricingAttributes}
                     >
                       + Add Condition
                     </button>
                   </div>
                   <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Type</label>
-                    <select value={rule.priceType} onChange={(e) => updateRule(index, { priceType: Number(e.target.value) })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasCompleteConditions}>
-                      {PRICE_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
-                    <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasCompleteConditions} />
+                    <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
                   <div className="md:col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                    <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasCompleteConditions} />
+                    <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
                   <div className="md:col-span-1">
-                    <button type="button" onClick={() => removeRule(index)} disabled={rules.length === 1} className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
+                    <button type="button" onClick={() => removeRule(index)} disabled={!hasPricingAttributes || rules.length === 1} className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
                   </div>
                   <div className="md:col-span-12">
                     {!hasCompleteConditions ? (
                       <p className="text-xs text-amber-700">
-                        Complete all attribute/value conditions first, then set price type and unit price.
+                        Complete selected pricing-attribute conditions first, then set unit price.
                       </p>
                     ) : null}
                     <p className="text-xs text-gray-500">
@@ -1481,6 +1544,55 @@ export default function EditProductPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Maximum uploads</label>
               <input type="number" min="0" value={maxUploads} onChange={(e) => setMaxUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={enableCustomDescription}
+                onChange={(e) => {
+                  const nextEnabled = e.target.checked;
+                  setEnableCustomDescription(nextEnabled);
+                  if (!nextEnabled) setIsCustomDescriptionRequired(false);
+                }}
+                className="rounded border-gray-300"
+              />
+              Show custom description/instructions box on storefront
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={isCustomDescriptionRequired}
+                onChange={(e) => setIsCustomDescriptionRequired(e.target.checked)}
+                disabled={!enableCustomDescription}
+                className="rounded border-gray-300"
+              />
+              Make this field required
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Field label</label>
+                <input
+                  value={customDescriptionLabel}
+                  onChange={(e) => setCustomDescriptionLabel(e.target.value)}
+                  placeholder="Description / Instructions"
+                  disabled={!enableCustomDescription}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Placeholder</label>
+                <input
+                  value={customDescriptionPlaceholder}
+                  onChange={(e) => setCustomDescriptionPlaceholder(e.target.value)}
+                  placeholder="Add any notes for production (optional)"
+                  disabled={!enableCustomDescription}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           </div>
           <div className="space-y-2">

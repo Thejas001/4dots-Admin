@@ -1,7 +1,14 @@
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+const resolvedBaseUrl = stripTrailingSlash(
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'https://localhost:7049',
+);
+
 // Global API Configuration
 export const API_CONFIG = {
   // Base URL for the API - change this to switch between environments
-  BASE_URL: 'https://localhost:7049',
+  BASE_URL: resolvedBaseUrl,
 
   
   // API endpoints
