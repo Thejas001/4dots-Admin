@@ -1301,6 +1301,10 @@ export default function NewProductPage() {
           {priceType !== 0 ? (
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <p className="text-sm font-medium text-gray-800">Multiplier Source</p>
+              <p className="text-xs text-gray-600">
+                This decides how many items to charge for. Example: if price is 100 each and value is 3, total is 300.
+                Choose <span className="font-medium">Number of uploads</span> when each uploaded file should count as one item.
+              </p>
               <div className="flex flex-wrap items-center gap-4">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1465,7 +1469,9 @@ export default function NewProductPage() {
                     </button>
                   </div>
                   <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {priceType === 0 ? 'Price' : 'Rate per item'}
+                    </label>
                     <input
                       type="number"
                       min="0"
