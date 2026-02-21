@@ -5,6 +5,7 @@ import api from '@/lib/axios';
 
 type AttributeEditor = {
   name: string;
+  affectsPricing: boolean;
   values: string[];
 };
 
@@ -16,15 +17,18 @@ type SavedAttributeValue = {
 type SavedAttribute = {
   AttributeID: number;
   AttributeName: string;
+  AffectsPricing: boolean;
   AttributeValues: SavedAttributeValue[];
 };
 
 type ProductDetailsResponse = {
   ProductID: number;
   ProductName?: string;
+  UiMode?: number;
   Attributes?: Array<{
     AttributeID?: number;
     AttributeName: string;
+    AffectsPricing?: boolean;
     AttributeValues?: SavedAttributeValue[];
     Values?: string[];
   }>;
@@ -75,6 +79,11 @@ type RuleDraft = {
 
 const PRICING_STRATEGIES = [
   { value: 0, label: 'Generic Matrix' },
+];
+
+const UI_MODES = [
+  { value: 1, label: 'Dynamic' },
+  { value: 0, label: 'Dedicated' },
 ];
 
 const PRICE_TYPES = [
@@ -131,6 +140,7 @@ export default function NewProductPage() {
   const [productName, setProductName] = useState('');
   const [description, setDescription] = useState('');
   const [pricingStrategy, setPricingStrategy] = useState(0);
+  const [uiMode, setUiMode] = useState(1);
   const [productId, setProductId] = useState<number | null>(null);
 
   const [attributes, setAttributes] = useState<AttributeEditor[]>([]);
@@ -168,6 +178,10 @@ export default function NewProductPage() {
     () => attributes.find((attribute) => attribute.name === selectedAttributeName),
     [attributes, selectedAttributeName],
   );
+  const pricingAttributes = useMemo(
+    () => savedAttributes.filter((attribute) => attribute.AffectsPricing),
+    [savedAttributes],
+  );
 
   const effectivePricingStrategy = pricingStrategy === 1 ? 0 : pricingStrategy;
 
@@ -182,6 +196,7 @@ export default function NewProductPage() {
     attributes
       .map((attribute) => ({
         AttributeName: attribute.name.trim(),
+        AffectsPricing: attribute.affectsPricing,
         Values: dedupeCaseInsensitive(attribute.values),
       }))
       .filter((attribute) => attribute.AttributeName.length > 0);
@@ -253,6 +268,7 @@ export default function NewProductPage() {
       return {
         AttributeID: Number(attribute.AttributeID || index + 1),
         AttributeName: attribute.AttributeName,
+        AffectsPricing: attribute.AffectsPricing ?? true,
         AttributeValues: explicitValues.length > 0 ? explicitValues : fallbackValues,
       };
     });
@@ -261,6 +277,7 @@ export default function NewProductPage() {
     // Keep UI editor synced with what backend persisted.
     const syncedEditor = mapped.map((attribute) => ({
       name: attribute.AttributeName,
+      affectsPricing: attribute.AffectsPricing,
       values: attribute.AttributeValues.map((value) => value.ValueName),
     }));
     setAttributes(syncedEditor);
@@ -302,6 +319,7 @@ export default function NewProductPage() {
           ProductName: cleanProductName,
           Description: description.trim() || null,
           PricingStrategy: effectivePricingStrategy,
+          UiMode: uiMode,
           Attributes: [],
           Addons: [],
         };
@@ -316,6 +334,7 @@ export default function NewProductPage() {
           ProductName: cleanProductName,
           Description: description.trim() || null,
           PricingStrategy: effectivePricingStrategy,
+          UiMode: uiMode,
           ReplaceAttributes: false,
           ReplaceAddons: false,
           Attributes: [],
@@ -343,9 +362,28 @@ export default function NewProductPage() {
     }
 
     setError(null);
-    setAttributes((prev) => [...prev, { name, values: [] }]);
+    setAttributes((prev) => [...prev, { name, affectsPricing: true, values: [] }]);
     setSelectedAttributeName(name);
     setAttributeNameInput('');
+  };
+
+  const toggleAttributeAffectsPricing = (name: string, affectsPricing: boolean) => {
+    if (!affectsPricing) {
+      const savedAttribute = getSavedAttributeByName(name);
+      if (savedAttribute && isAttributeUsedInRules(savedAttribute.AttributeID)) {
+        setError(
+          `Cannot mark "${name}" as non-pricing because it is used in pricing rules. Update rules first.`,
+        );
+        return;
+      }
+    }
+
+    setError(null);
+    setAttributes((prev) =>
+      prev.map((attribute) =>
+        attribute.name === name ? { ...attribute, affectsPricing } : attribute,
+      ),
+    );
   };
 
   const removeAttributeName = (name: string) => {
@@ -779,7 +817,7 @@ export default function NewProductPage() {
   };
 
   const canConfigureAttributes = productId !== null;
-  const canConfigurePricing = productId !== null && savedAttributes.length > 0;
+  const canConfigurePricing = productId !== null && pricingAttributes.length > 0;
   const canConfigureMeta = productId !== null;
 
   return (
@@ -810,7 +848,7 @@ export default function NewProductPage() {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
               <input
@@ -831,6 +869,20 @@ export default function NewProductPage() {
                 {PRICING_STRATEGIES.map((strategy) => (
                   <option key={strategy.value} value={strategy.value}>
                     {strategy.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Product UI Mode</label>
+              <select
+                value={uiMode}
+                onChange={(e) => setUiMode(Number(e.target.value))}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {UI_MODES.map((mode) => (
+                  <option key={mode.value} value={mode.value}>
+                    {mode.label}
                   </option>
                 ))}
               </select>
@@ -891,18 +943,47 @@ export default function NewProductPage() {
                 ) : (
                   attributes.map((attribute) => (
                     <div key={attribute.name} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAttributeSelectionChange(attribute.name)}
-                        className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}
-                      >
-                        {attribute.name}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleAttributeSelectionChange(attribute.name)}
+                          className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}
+                        >
+                          {attribute.name}
+                        </button>
+                        <label className="inline-flex items-center gap-1 text-[11px] text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={attribute.affectsPricing}
+                            onChange={(e) => toggleAttributeAffectsPricing(attribute.name, e.target.checked)}
+                            disabled={!canConfigureAttributes}
+                            className="rounded border-gray-300"
+                          />
+                          Affects pricing
+                        </label>
+                        {(() => {
+                          const savedAttribute = getSavedAttributeByName(attribute.name);
+                          const usageCount = savedAttribute ? getAttributeRuleUsageCount(savedAttribute.AttributeID) : 0;
+                          if (usageCount <= 0) return null;
+                          return (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                              Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeAttributeName(attribute.name)}
-                        className="text-xs font-medium text-red-700 hover:text-red-800"
-                        disabled={!canConfigureAttributes}
+                        className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                        disabled={
+                          !canConfigureAttributes ||
+                          (() => {
+                            const savedAttribute = getSavedAttributeByName(attribute.name);
+                            if (!savedAttribute) return false;
+                            return getAttributeRuleUsageCount(savedAttribute.AttributeID) > 0;
+                          })()
+                        }
                       >
                         Remove
                       </button>
@@ -954,12 +1035,40 @@ export default function NewProductPage() {
                 ) : (
                   selectedAttributeEditor.values.map((value) => (
                     <div key={value} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                      <span className="text-sm text-gray-700">{value}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-700">{value}</span>
+                        {(() => {
+                          const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                          const savedValue = savedAttribute?.AttributeValues.find(
+                            (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                          );
+                          const usageCount =
+                            savedAttribute && savedValue
+                              ? getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID)
+                              : 0;
+                          if (usageCount <= 0) return null;
+                          return (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                              Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeValueFromSelectedAttribute(value)}
-                        className="text-xs font-medium text-red-700 hover:text-red-800"
-                        disabled={!canConfigureAttributes}
+                        className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                        disabled={
+                          !canConfigureAttributes ||
+                          (() => {
+                            const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                            const savedValue = savedAttribute?.AttributeValues.find(
+                              (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                            );
+                            if (!savedAttribute || !savedValue) return false;
+                            return getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID) > 0;
+                          })()
+                        }
                       >
                         Remove
                       </button>
@@ -989,7 +1098,14 @@ export default function NewProductPage() {
                   <div key={attribute.AttributeID} className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="text-sm font-medium text-gray-900">
                       {attribute.AttributeName}{' '}
-                      <span className="text-xs font-normal text-gray-500">(AttributeID: {attribute.AttributeID})</span>
+                      <span className="text-xs font-normal text-gray-500">(AttributeID: {attribute.AttributeID})</span>{' '}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          attribute.AffectsPricing ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {attribute.AffectsPricing ? 'Pricing' : 'Display only'}
+                      </span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {attribute.AttributeValues.length === 0 ? (
@@ -1085,7 +1201,7 @@ export default function NewProductPage() {
                             disabled={!canConfigurePricing}
                           >
                             <option value="">Attribute</option>
-                            {savedAttributes.map((attribute) => (
+                            {pricingAttributes.map((attribute) => (
                               <option key={attribute.AttributeID} value={attribute.AttributeID}>
                                 {attribute.AttributeName}
                               </option>

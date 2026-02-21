@@ -6,6 +6,7 @@ import api from '@/lib/axios';
 
 type AttributeEditor = {
   name: string;
+  affectsPricing: boolean;
   values: string[];
 };
 
@@ -17,6 +18,7 @@ type SavedAttributeValue = {
 type SavedAttribute = {
   AttributeID: number;
   AttributeName: string;
+  AffectsPricing: boolean;
   AttributeValues: SavedAttributeValue[];
 };
 
@@ -35,11 +37,13 @@ type ProductDetailsResponse = {
   ProductName: string;
   Description?: string | null;
   PricingStrategy?: number;
+  UiMode?: number;
   ListingStatus?: number;
   IsEnabled?: boolean;
   Attributes?: Array<{
     AttributeID?: number;
     AttributeName: string;
+    AffectsPricing?: boolean;
     AttributeValues?: SavedAttributeValue[];
     Values?: string[];
   }>;
@@ -93,6 +97,10 @@ type ProductMediaItem = {
 };
 
 const PRICING_STRATEGIES = [{ value: 0, label: 'Generic Matrix' }];
+const UI_MODES = [
+  { value: 1, label: 'Dynamic' },
+  { value: 0, label: 'Dedicated' },
+];
 
 const PRICE_TYPES = [
   { value: 0, label: 'Flat' },
@@ -262,6 +270,7 @@ export default function EditProductPage() {
   const [productName, setProductName] = useState('');
   const [description, setDescription] = useState('');
   const [pricingStrategy, setPricingStrategy] = useState(0);
+  const [uiMode, setUiMode] = useState(1);
   const [listingStatus, setListingStatus] = useState(0);
   const [isEnabled, setIsEnabled] = useState(false);
 
@@ -315,6 +324,7 @@ export default function EditProductPage() {
       return {
         AttributeID: Number(attribute.AttributeID || index + 1),
         AttributeName: attribute.AttributeName,
+        AffectsPricing: attribute.AffectsPricing ?? true,
         AttributeValues: explicitValues.length > 0 ? explicitValues : fallbackValues,
       };
     });
@@ -533,6 +543,7 @@ export default function EditProductPage() {
       setProductName(details.ProductName || '');
       setDescription(details.Description || '');
       setPricingStrategy(Number(details.PricingStrategy ?? 0));
+      setUiMode(Number(details.UiMode ?? 1));
       setListingStatus(Number(details.ListingStatus ?? 0));
       setIsEnabled(Boolean(details.IsEnabled));
 
@@ -540,6 +551,7 @@ export default function EditProductPage() {
       setSavedAttributes(mappedAttributes);
       const editor = mappedAttributes.map((attribute) => ({
         name: attribute.AttributeName,
+        affectsPricing: attribute.AffectsPricing,
         values: attribute.AttributeValues.map((value) => value.ValueName),
       }));
       setAttributes(editor);
@@ -587,6 +599,7 @@ export default function EditProductPage() {
         ProductID: productId,
         ProductName: cleanName,
         Description: description.trim() || null,
+        UiMode: uiMode,
         ListingStatus: listingStatus,
         IsEnabled: isEnabled,
       });
@@ -609,9 +622,28 @@ export default function EditProductPage() {
       return;
     }
     setError(null);
-    setAttributes((prev) => [...prev, { name, values: [] }]);
+    setAttributes((prev) => [...prev, { name, affectsPricing: true, values: [] }]);
     setSelectedAttributeName(name);
     setAttributeNameInput('');
+  };
+
+  const toggleAttributeAffectsPricing = (name: string, affectsPricing: boolean) => {
+    if (!affectsPricing) {
+      const savedAttribute = getSavedAttributeByName(name);
+      if (savedAttribute && isAttributeUsedInRules(savedAttribute.AttributeID)) {
+        setError(
+          `Cannot mark "${name}" as non-pricing because it is used in pricing rules. Update rules first.`,
+        );
+        return;
+      }
+    }
+
+    setError(null);
+    setAttributes((prev) =>
+      prev.map((attribute) =>
+        attribute.name === name ? { ...attribute, affectsPricing } : attribute,
+      ),
+    );
   };
 
   const removeAttributeName = (name: string) => {
@@ -715,6 +747,7 @@ export default function EditProductPage() {
     const payloadAttributes = attributes
       .map((attribute) => ({
         AttributeName: attribute.name.trim(),
+        AffectsPricing: attribute.affectsPricing,
         Values: dedupeCaseInsensitive(attribute.values),
       }))
       .filter((attribute) => attribute.AttributeName.length > 0);
@@ -743,6 +776,11 @@ export default function EditProductPage() {
 
   const getAttributeById = (id: number | '') =>
     savedAttributes.find((attribute) => attribute.AttributeID === id);
+
+  const pricingAttributes = useMemo(
+    () => savedAttributes.filter((attribute) => attribute.AffectsPricing),
+    [savedAttributes],
+  );
 
   const getSavedAttributeByName = (name: string) =>
     savedAttributes.find(
@@ -1011,7 +1049,7 @@ export default function EditProductPage() {
 
         <form onSubmit={handleSaveBasics} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Basics & Status</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
               <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
@@ -1021,6 +1059,14 @@ export default function EditProductPage() {
               <select value={pricingStrategy} onChange={(e) => setPricingStrategy(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
                 {PRICING_STRATEGIES.map((strategy) => (
                   <option key={strategy.value} value={strategy.value}>{strategy.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Product UI Mode</label>
+              <select value={uiMode} onChange={(e) => setUiMode(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+                {UI_MODES.map((mode) => (
+                  <option key={mode.value} value={mode.value}>{mode.label}</option>
                 ))}
               </select>
             </div>
@@ -1065,6 +1111,15 @@ export default function EditProductPage() {
                   <div key={attribute.name} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => setSelectedAttributeName(attribute.name)} className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}>{attribute.name}</button>
+                      <label className="inline-flex items-center gap-1 text-[11px] text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={attribute.affectsPricing}
+                          onChange={(e) => toggleAttributeAffectsPricing(attribute.name, e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        Affects pricing
+                      </label>
                       {(() => {
                         const savedAttribute = getSavedAttributeByName(attribute.name);
                         const usageCount = savedAttribute ? getAttributeRuleUsageCount(savedAttribute.AttributeID) : 0;
@@ -1201,7 +1256,7 @@ export default function EditProductPage() {
                             className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
                           >
                             <option value="">Attribute</option>
-                            {savedAttributes.map((attribute) => (
+                            {pricingAttributes.map((attribute) => (
                               <option key={attribute.AttributeID} value={attribute.AttributeID}>
                                 {attribute.AttributeName}
                               </option>

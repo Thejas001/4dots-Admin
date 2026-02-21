@@ -9,6 +9,7 @@ type Product = {
   Description?: string | null;
   ProductImage?: string | null;
   PricingStrategy?: number;
+  UiMode?: number;
   ListingStatus?: number;
   IsEnabled?: boolean;
 };
@@ -117,6 +118,7 @@ export default function ProductsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UI Mode</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Listing</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enabled</th>
                   <th className="px-6 py-3" />
@@ -125,7 +127,7 @@ export default function ProductsPage() {
               <tbody className="bg-white divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
                       <svg className="animate-spin h-5 w-5 inline text-gray-400" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -134,7 +136,7 @@ export default function ProductsPage() {
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-gray-500">No products found</td>
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">No products found</td>
                   </tr>
                 ) : (
                   filteredProducts.map((product) => (
@@ -154,6 +156,15 @@ export default function ProductsPage() {
                       <td className="px-6 py-4 text-gray-900">{product.ProductName}</td>
                       <td className="px-6 py-4 text-gray-600 max-w-xl truncate">
                         {product.Description || 'No description'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          Number(product.UiMode ?? 1) === 1
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {Number(product.UiMode ?? 1) === 1 ? 'Dynamic' : 'Dedicated'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -229,6 +240,13 @@ export default function ProductsPage() {
                         <h3 className="text-base font-semibold text-gray-900 truncate">{product.ProductName}</h3>
                         <p className="mt-1 text-sm text-gray-600 line-clamp-2">{product.Description || 'No description'}</p>
                         <div className="mt-2 flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                            Number(product.UiMode ?? 1) === 1
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {Number(product.UiMode ?? 1) === 1 ? 'Dynamic' : 'Dedicated'}
+                          </span>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
                             product.ListingStatus === 1
                               ? 'bg-green-100 text-green-700'
