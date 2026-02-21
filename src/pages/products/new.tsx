@@ -89,6 +89,13 @@ const UI_MODES = [
   { value: 1, label: 'Dynamic' },
   { value: 0, label: 'Dedicated' },
 ];
+const PRICE_TYPES = [
+  { value: 0, label: 'Flat' },
+  { value: 1, label: 'Per Unit' },
+  { value: 2, label: 'Per Area' },
+  { value: 3, label: 'Per Page' },
+];
+const UPLOAD_COUNT_INPUT_KEY = 'UploadCount';
 
 const createEmptyRule = (index: number): RuleDraft => ({
   conditions: [{ attributeId: '', attributeValueId: '' }],
@@ -149,6 +156,11 @@ export default function NewProductPage() {
 
   const [rules, setRules] = useState<RuleDraft[]>([createEmptyRule(0)]);
   const [replaceRules, setReplaceRules] = useState(true);
+  const [priceType, setPriceType] = useState(0);
+  const [multiplierMode, setMultiplierMode] = useState<'manual' | 'upload_count'>('manual');
+  const [multiplierInputKey, setMultiplierInputKey] = useState('Quantity');
+  const [minMultiplier, setMinMultiplier] = useState('');
+  const [maxMultiplier, setMaxMultiplier] = useState('');
 
   const [savingBasics, setSavingBasics] = useState(false);
   const [savingAttributes, setSavingAttributes] = useState(false);
@@ -686,6 +698,41 @@ export default function NewProductPage() {
       return;
     }
 
+    const requiresMultiplier = priceType !== 0;
+    const trimmedManualInputKey = multiplierInputKey.trim();
+    const parsedMinMultiplier = minMultiplier.trim() === '' ? null : Number(minMultiplier);
+    const parsedMaxMultiplier = maxMultiplier.trim() === '' ? null : Number(maxMultiplier);
+    const uploadMin = minUploads.trim() === '' ? null : Number(minUploads);
+    const uploadMax = maxUploads.trim() === '' ? null : Number(maxUploads);
+
+    if (requiresMultiplier && multiplierMode === 'manual' && !trimmedManualInputKey) {
+      setError('Multiplier input key is required for non-flat price types.');
+      return;
+    }
+
+    if (requiresMultiplier && multiplierMode === 'upload_count') {
+      if (uploadMax === null || Number.isNaN(uploadMax) || uploadMax <= 0) {
+        setError('Configure upload policy (maximum uploads > 0) before using upload-count based pricing.');
+        return;
+      }
+      if (uploadMin !== null && Number.isNaN(uploadMin)) {
+        setError('Minimum uploads must be a valid number.');
+        return;
+      }
+    }
+
+    if (
+      requiresMultiplier &&
+      parsedMinMultiplier !== null &&
+      parsedMaxMultiplier !== null &&
+      !Number.isNaN(parsedMinMultiplier) &&
+      !Number.isNaN(parsedMaxMultiplier) &&
+      parsedMaxMultiplier < parsedMinMultiplier
+    ) {
+      setError('Max multiplier must be greater than or equal to Min multiplier.');
+      return;
+    }
+
     const validRules = rules.filter(
       (rule) =>
         rule.unitPrice !== '' &&
@@ -716,16 +763,28 @@ export default function NewProductPage() {
       return;
     }
 
-    const hasUnsupportedPriceType = validRules.some((rule) => Number(rule.priceType) !== 0);
-    if (hasUnsupportedPriceType) {
-      setError(
-        'Per Unit/Area/Page pricing requires Multiplier Input Key and input definitions. This screen currently supports Flat pricing only.',
-      );
-      return;
-    }
-
     setSavingPricing(true);
     try {
+      const activeInputKey =
+        requiresMultiplier
+          ? multiplierMode === 'upload_count'
+            ? UPLOAD_COUNT_INPUT_KEY
+            : trimmedManualInputKey
+          : null;
+
+      const effectiveMinMultiplier =
+        !requiresMultiplier
+          ? null
+          : multiplierMode === 'upload_count'
+            ? uploadMin
+            : parsedMinMultiplier;
+      const effectiveMaxMultiplier =
+        !requiresMultiplier
+          ? null
+          : multiplierMode === 'upload_count'
+            ? uploadMax
+            : parsedMaxMultiplier;
+
       const usedRuleNames = new Set<string>();
       const payloadRules = validRules.map((rule) => {
         const ruleNameTokens = rule.conditions.map((condition) => {
@@ -740,11 +799,11 @@ export default function NewProductPage() {
 
         return {
           RuleName: buildUniqueRuleName(ruleNameTokens, usedRuleNames),
-          PriceType: 0,
+          PriceType: Number(priceType),
           UnitPrice: Number(rule.unitPrice),
-          MultiplierInputKey: null,
-          MinMultiplier: null,
-          MaxMultiplier: null,
+          MultiplierInputKey: activeInputKey,
+          MinMultiplier: effectiveMinMultiplier,
+          MaxMultiplier: effectiveMaxMultiplier,
           IsActive: true,
           Priority: Number(rule.priority || 100),
           ValidFrom: null,
@@ -759,7 +818,18 @@ export default function NewProductPage() {
       const payload = {
         PricingStrategy: effectivePricingStrategy,
         ReplaceRules: replaceRules,
-        InputDefinitions: [],
+        InputDefinitions:
+          requiresMultiplier && activeInputKey
+            ? [
+                {
+                  InputKey: activeInputKey,
+                  DataType: 0, // Int
+                  IsRequired: true,
+                  MinValue: effectiveMinMultiplier,
+                  MaxValue: effectiveMaxMultiplier,
+                },
+              ]
+            : [],
         Rules: payloadRules,
       };
 
@@ -1209,6 +1279,93 @@ export default function NewProductPage() {
               Replace existing rules on save
             </label>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price Type</label>
+              <select
+                value={priceType}
+                onChange={(e) => setPriceType(Number(e.target.value))}
+                disabled={!canConfigurePricing || !hasPricingAttributes}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {PRICE_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {priceType !== 0 ? (
+            <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <p className="text-sm font-medium text-gray-800">Multiplier Source</p>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    checked={multiplierMode === 'manual'}
+                    onChange={() => setMultiplierMode('manual')}
+                    disabled={!canConfigurePricing || !hasPricingAttributes}
+                  />
+                  Manual input
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    checked={multiplierMode === 'upload_count'}
+                    onChange={() => setMultiplierMode('upload_count')}
+                    disabled={!canConfigurePricing || !hasPricingAttributes}
+                  />
+                  Number of uploads
+                </label>
+              </div>
+
+              {multiplierMode === 'manual' ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Input Key</label>
+                    <input
+                      value={multiplierInputKey}
+                      onChange={(e) => setMultiplierInputKey(e.target.value)}
+                      placeholder="Quantity"
+                      disabled={!canConfigurePricing || !hasPricingAttributes}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Min Multiplier</label>
+                    <input
+                      type="number"
+                      value={minMultiplier}
+                      onChange={(e) => setMinMultiplier(e.target.value)}
+                      placeholder="Optional"
+                      disabled={!canConfigurePricing || !hasPricingAttributes}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Multiplier</label>
+                    <input
+                      type="number"
+                      value={maxMultiplier}
+                      onChange={(e) => setMaxMultiplier(e.target.value)}
+                      placeholder="Optional"
+                      disabled={!canConfigurePricing || !hasPricingAttributes}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-700">
+                  Uses upload count from meta config as multiplier key <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
+                  Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
+                  <span className="font-semibold">{maxUploads || 'not set'}</span>.
+                </div>
+              )}
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
