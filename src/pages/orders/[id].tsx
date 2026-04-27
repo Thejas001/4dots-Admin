@@ -100,7 +100,9 @@ const OrderDetail = () => {
         
         // Convert map values to array and sort by OrderId (newest first)
         const orders = Array.from(ordersMap.values()).sort((a, b) => b.OrderId - a.OrderId);
+        console.log('Previous Orders Summary:', orders);
         setPreviousOrders(orders);
+
       }
     } catch (err) {
       console.error('Error fetching previous orders:', err);
@@ -125,6 +127,8 @@ const OrderDetail = () => {
       if (!res.ok) throw new Error(data?.message || 'Failed to fetch order details');
       if (!data?.Success) throw new Error(data?.Message || 'Failed to fetch order details');
       setCurrentOrder(data.Data);
+      console.log('Order Details:', data.Data);
+
     } catch (err: any) {
       if (!silent) setNotification({ type: 'error', message: err.message });
     } finally {
@@ -484,7 +488,9 @@ const OrderDetail = () => {
                     )?.AttributeValue;
                     const calculatedPrice = calculatedPriceStr ? parseFloat(calculatedPriceStr) : 0;
 
-                    const comment = getDynamicAttr(item.DynamicAttributes, 'ProductComment');
+                    const comment = getDynamicAttr(item.DynamicAttributes, 'ProductComment') || getDynamicAttr(item.DynamicAttributes, 'Comment');
+                    const width = getDynamicAttr(item.DynamicAttributes, 'Width') || getDynamicAttr(item.DynamicAttributes, 'CanvasWidth');
+                    const height = getDynamicAttr(item.DynamicAttributes, 'Height') || getDynamicAttr(item.DynamicAttributes, 'CanvasHeight');
                     const colorRange = getDynamicAttr(item.DynamicAttributes, 'ColorPrintRange');
                     const pageCount = getDynamicAttr(item.DynamicAttributes, 'PageCount');
                     const colorPages = getDynamicAttr(item.DynamicAttributes, 'TotalColorPageCount');
@@ -495,6 +501,8 @@ const OrderDetail = () => {
                     const dynamicQuantity = getDynamicAttr(item.DynamicAttributes, 'Quantity');
                     const acrylicClockCount = getDynamicAttr(item.DynamicAttributes, 'TotalAcrylicWallClockCount');
                     const templateName = getDynamicAttr(item.DynamicAttributes, 'TemplateName');
+                    const squareFeet = getDynamicAttr(item.DynamicAttributes, 'SquareFeet');
+
 
                     const basePrice = item.IsCustomProduct ? (item.CustomBasePrice ?? item.Price ?? 0) : (item.Price ?? 0);
                     const actualQuantity = acrylicClockCount || dynamicQuantity || posterBundleQuantity || (item.Quantity ?? 1);
@@ -524,7 +532,14 @@ const OrderDetail = () => {
                             {comment && (
                               <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                                 <p className="font-semibold text-yellow-800 text-sm">Special Instructions</p>
-                                <p className="text-yellow-900 text-sm">{comment}</p>
+                                <p className="text-yellow-900 text-sm whitespace-pre-wrap">{comment}</p>
+                              </div>
+                            )}
+
+                            {(width || height) && (
+                              <div className="bg-purple-50 border border-purple-200 p-3 rounded-lg mt-2">
+                                <p className="font-semibold text-purple-800 text-sm">Canvas Dimensions</p>
+                                <p className="text-purple-900 text-sm">{width || '-'} x {height || '-'}</p>
                               </div>
                             )}
 
@@ -557,9 +572,10 @@ const OrderDetail = () => {
                               </div>
                             )}
 
-                            {(colorRange || pageCount || colorPages || bwPages || copies || numberOfCards) && (
+                            {(colorRange || pageCount || colorPages || bwPages || copies || numberOfCards || squareFeet) && (
                               <div className="flex flex-wrap gap-3 text-sm mt-2">
                                 {colorRange && <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full font-medium">Color: {colorRange}</span>}
+                                {squareFeet && <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-medium">Size: {squareFeet} Sq.Ft</span>}
                                 {pageCount && <span className="text-gray-700"><strong>Total Pages:</strong> {pageCount}</span>}
                                 {colorPages && <span className="text-teal-700"><strong>Color Pages:</strong> {colorPages}</span>}
                                 {bwPages && <span className="text-gray-700"><strong>B&W Pages:</strong> {bwPages}</span>}
@@ -567,6 +583,22 @@ const OrderDetail = () => {
                                 {numberOfCards && <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-medium">Number of Cards: {numberOfCards}</span>}
                               </div>
                             )}
+
+                            {/* Other Dynamic Attributes */}
+                            <div className="text-sm space-y-1 mt-2">
+                              {item.DynamicAttributes?.filter((a: any) => 
+                                !['ProductComment', 'Comment', 'ColorPrintRange', 'PageCount', 'TotalColorPageCount', 
+                                  'TotalBwPageCount', 'NumberOfCopies', 'NumberOfCards', 'PosterBundleQuantity', 
+                                  'Quantity', 'TotalAcrylicWallClockCount', 'TemplateName', 'SquareFeet', 
+                                  'CalculatedTotalPrice', 'Width', 'Height', 'CanvasWidth', 'CanvasHeight'].includes(a.AttributeName)
+                              ).map((a: any, i: number) => (
+                                <div key={i} className="flex justify-between border-b border-gray-50 py-1">
+                                  <span className="text-gray-600">{a.AttributeName}:</span>
+                                  <span className="font-medium">{a.AttributeValue}</span>
+                                </div>
+                              ))}
+                            </div>
+
                           </div>
 
                           <div className="text-right space-y-1">
