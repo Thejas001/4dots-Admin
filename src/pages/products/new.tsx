@@ -84,6 +84,15 @@ type RuleDraft = {
   priceType: number;
 };
 
+type PricingValidationState = {
+  priceType?: string;
+  factorInput?: string;
+  minFactor?: string;
+  maxFactor?: string;
+  uploadPolicy?: string;
+  rules?: string;
+};
+
 const PRICING_STRATEGIES = [
   { value: 0, label: 'Generic Matrix' },
 ];
@@ -166,9 +175,10 @@ export default function NewProductPage() {
   const [replaceRules, setReplaceRules] = useState(true);
   const [priceType, setPriceType] = useState(0);
   const [multiplierMode, setMultiplierMode] = useState<'manual' | 'upload_count'>('manual');
-  const [multiplierInputKey, setMultiplierInputKey] = useState('Factor');
+  const [multiplierInputKey, setMultiplierInputKey] = useState('PricingFactor');
   const [minMultiplier, setMinMultiplier] = useState('');
   const [maxMultiplier, setMaxMultiplier] = useState('');
+  const [pricingValidation, setPricingValidation] = useState<PricingValidationState>({});
 
   const [savingBasics, setSavingBasics] = useState(false);
   const [savingAttributes, setSavingAttributes] = useState(false);
@@ -692,13 +702,16 @@ export default function NewProductPage() {
   const handleSavePricing = async () => {
     setError(null);
     setPricingMessage(null);
+    setPricingValidation({});
 
     if (!productId) {
       setError('Save basics first.');
+      setPricingValidation({ priceType: 'Save basics first to configure pricing.' });
       return;
     }
     if (savedAttributes.length === 0) {
       setError('Save attributes first before configuring pricing.');
+      setPricingValidation({ priceType: 'Save attributes first before configuring pricing.' });
       return;
     }
     if (pricingAttributes.length === 0) {
@@ -728,21 +741,25 @@ export default function NewProductPage() {
     const uploadMax = maxUploads.trim() === '' ? null : Number(maxUploads);
 
     if (requiresMultiplier && multiplierMode === 'manual' && !trimmedManualInputKey) {
-      setError('Multiplier input key is required for non-flat price types.');
+      setError('Pricing factor input is required for non-flat price types.');
+      setPricingValidation({ factorInput: 'Pricing factor input is required for non-flat price types.' });
       return;
     }
     if (requiresMultiplier && multiplierMode === 'manual' && isQuantityLikeInputKey(trimmedManualInputKey)) {
       setError('Use Upload Policy order quantity for copies. Variable factor input key cannot be Quantity/Qty.');
+      setPricingValidation({ factorInput: 'Use a non-quantity pricing factor input (for example: Pages, Area, UploadCount).' });
       return;
     }
 
     if (requiresMultiplier && multiplierMode === 'upload_count') {
       if (uploadMax === null || Number.isNaN(uploadMax) || uploadMax <= 0) {
         setError('Configure upload policy (maximum uploads > 0) before using upload-count based pricing.');
+        setPricingValidation({ uploadPolicy: 'Set Upload Policy max uploads greater than 0 for upload-count based pricing.' });
         return;
       }
       if (uploadMin !== null && Number.isNaN(uploadMin)) {
         setError('Minimum uploads must be a valid number.');
+        setPricingValidation({ uploadPolicy: 'Minimum uploads must be a valid number.' });
         return;
       }
     }
@@ -755,7 +772,8 @@ export default function NewProductPage() {
       !Number.isNaN(parsedMaxMultiplier) &&
       parsedMaxMultiplier < parsedMinMultiplier
     ) {
-      setError('Max multiplier must be greater than or equal to Min multiplier.');
+      setError('Maximum pricing factor must be greater than or equal to minimum pricing factor.');
+      setPricingValidation({ maxFactor: 'Maximum pricing factor must be greater than or equal to minimum pricing factor.' });
       return;
     }
 
@@ -769,6 +787,7 @@ export default function NewProductPage() {
     );
     if (validRules.length === 0) {
       setError('Add at least one complete pricing rule.');
+      setPricingValidation({ rules: 'Add at least one complete pricing rule.' });
       return;
     }
 
@@ -778,6 +797,7 @@ export default function NewProductPage() {
     });
     if (hasDuplicateConditions) {
       setError('A rule cannot contain the same attribute more than once.');
+      setPricingValidation({ rules: 'A rule cannot contain the same attribute more than once.' });
       return;
     }
     const pricingAttributeIdSet = new Set(pricingAttributes.map((attribute) => attribute.AttributeID));
@@ -786,6 +806,7 @@ export default function NewProductPage() {
     );
     if (hasNonPricingCondition) {
       setError('Pricing rules can only use attributes marked as "Affects pricing".');
+      setPricingValidation({ rules: 'Pricing rules can only use attributes marked as "Affects pricing".' });
       return;
     }
 
@@ -988,6 +1009,55 @@ export default function NewProductPage() {
   const canConfigurePricing = productId !== null;
   const hasPricingAttributes = pricingAttributes.length > 0;
   const canConfigureMeta = productId !== null;
+  const requiresPricingFactor = priceType !== 0;
+  const trimmedPricingFactorInput = multiplierInputKey.trim();
+  const completeRuleCount = useMemo(
+    () =>
+      rules.filter(
+        (rule) =>
+          rule.unitPrice !== '' &&
+          rule.conditions.length > 0 &&
+          rule.conditions.every(
+            (condition) => condition.attributeId !== '' && condition.attributeValueId !== '',
+          ),
+      ).length,
+    [rules],
+  );
+  const sampleQuantity = enableOrderQuantity
+    ? Math.max(Number(minOrderQuantity || '1') || 1, 1)
+    : 1;
+  const samplePricingFactor = !requiresPricingFactor
+    ? 1
+    : multiplierMode === 'upload_count'
+      ? Math.max(Number(minUploads || '1') || 1, 1)
+      : Math.max(Number(minMultiplier || '1') || 1, 1);
+  const sampleUnitPrice = 100;
+  const sampleTotal = sampleUnitPrice * sampleQuantity * samplePricingFactor;
+  const pricingHealthChecks = [
+    {
+      label: 'Pricing attributes available',
+      valid: hasPricingAttributes,
+    },
+    {
+      label: 'Pricing factor input configured',
+      valid:
+        !requiresPricingFactor ||
+        multiplierMode === 'upload_count' ||
+        (trimmedPricingFactorInput.length > 0 &&
+          !isQuantityLikeInputKey(trimmedPricingFactorInput)),
+    },
+    {
+      label: 'Upload linkage valid',
+      valid:
+        !requiresPricingFactor ||
+        multiplierMode !== 'upload_count' ||
+        ((Number(maxUploads || '0') || 0) > 0),
+    },
+    {
+      label: 'At least one complete pricing rule',
+      valid: completeRuleCount > 0,
+    },
+  ];
 
   return (
     <ProtectedRoute>
@@ -1300,9 +1370,16 @@ export default function NewProductPage() {
 
         <div className={`space-y-4 rounded-2xl border p-6 shadow-sm ${canConfigurePricing ? 'border-gray-100 bg-white' : 'border-gray-200 bg-gray-50'}`}>
           <h2 className="text-lg font-semibold text-gray-900">3. Pricing Rules</h2>
-          <p className="text-sm text-gray-600">
-            Configure pricing only with attributes marked as pricing-relevant.
-          </p>
+          <p className="text-sm text-gray-600">Configure pricing only with attributes marked as pricing-relevant.</p>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <p className="text-sm font-semibold text-blue-900">How Price Is Calculated</p>
+            <p className="mt-1 text-xs text-blue-800">
+              Final price = Unit Price x Quantity x Pricing Factor
+            </p>
+            <p className="mt-1 text-xs text-blue-700">
+              Example: {sampleUnitPrice} x {sampleQuantity} x {samplePricingFactor} = {sampleTotal}
+            </p>
+          </div>
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
             Pricing attributes: {pricingAttributes.length} | Non-pricing attributes: {nonPricingAttributes.length}
           </div>
@@ -1341,14 +1418,18 @@ export default function NewProductPage() {
                   </option>
                 ))}
               </select>
+              {pricingValidation.priceType ? (
+                <p className="mt-1 text-xs text-red-600">{pricingValidation.priceType}</p>
+              ) : null}
             </div>
           </div>
 
           {priceType !== 0 ? (
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-800">Variable Factor Source</p>
+              <p className="text-sm font-medium text-gray-800">Pricing Factor Source</p>
               <p className="text-xs text-gray-600">
-                This is an additional factor beyond order quantity. Example: unit 100, order qty 2, factor 3 = total 600.
+                This is an additional factor beyond order quantity. Final price = unit price x quantity x pricing factor.
+                Example: unit 100, order qty 2, pricing factor 3 = total 600.
                 Use <span className="font-medium">Number of uploads</span> when each uploaded file should add to pricing.
               </p>
               <div className="flex flex-wrap items-center gap-4">
@@ -1359,7 +1440,7 @@ export default function NewProductPage() {
                     onChange={() => setMultiplierMode('manual')}
                     disabled={!canConfigurePricing || !hasPricingAttributes}
                   />
-                  Manual factor
+                  Manual pricing factor
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -1375,20 +1456,23 @@ export default function NewProductPage() {
               {multiplierMode === 'manual' ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Input Key</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Pricing Factor Input</label>
                     <input
                       value={multiplierInputKey}
                       onChange={(e) => setMultiplierInputKey(e.target.value)}
-                      placeholder="Pages / Area / Factor"
+                      placeholder="Pages / Area / PricingFactor"
                       disabled={!canConfigurePricing || !hasPricingAttributes}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                     />
                     <p className="mt-1 text-[11px] text-gray-500">
                       Do not use Quantity here. Order quantity is configured in Upload Policy.
                     </p>
+                    {pricingValidation.factorInput ? (
+                      <p className="mt-1 text-xs text-red-600">{pricingValidation.factorInput}</p>
+                    ) : null}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Min Factor</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Minimum Pricing Factor</label>
                     <input
                       type="number"
                       value={minMultiplier}
@@ -1397,9 +1481,12 @@ export default function NewProductPage() {
                       disabled={!canConfigurePricing || !hasPricingAttributes}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                     />
+                    {pricingValidation.minFactor ? (
+                      <p className="mt-1 text-xs text-red-600">{pricingValidation.minFactor}</p>
+                    ) : null}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Factor</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Maximum Pricing Factor</label>
                     <input
                       type="number"
                       value={maxMultiplier}
@@ -1408,17 +1495,38 @@ export default function NewProductPage() {
                       disabled={!canConfigurePricing || !hasPricingAttributes}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                     />
+                    {pricingValidation.maxFactor ? (
+                      <p className="mt-1 text-xs text-red-600">{pricingValidation.maxFactor}</p>
+                    ) : null}
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-gray-700">
-                  Uses upload count from meta config as factor key <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
-                  Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
-                  <span className="font-semibold">{maxUploads || 'not set'}</span>.
-                </div>
+                <>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Linked to Upload Policy: upload count is used as the pricing factor input.
+                  </div>
+                  <div className="text-xs text-gray-700">
+                    Uses upload count from meta config as pricing factor input <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
+                    Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
+                    <span className="font-semibold">{maxUploads || 'not set'}</span>.
+                  </div>
+                  {pricingValidation.uploadPolicy ? (
+                    <p className="text-xs text-red-600">{pricingValidation.uploadPolicy}</p>
+                  ) : null}
+                </>
               )}
             </div>
           ) : null}
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+            <div className="mt-2 space-y-1 text-xs">
+              {pricingHealthChecks.map((item) => (
+                <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                  {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -1432,6 +1540,9 @@ export default function NewProductPage() {
                   + Add Rule
               </button>
             </div>
+            {pricingValidation.rules ? (
+              <p className="text-xs text-red-600">{pricingValidation.rules}</p>
+            ) : null}
 
             {rules.map((rule, index) => {
               const ruleNameTokens = rule.conditions
@@ -1546,7 +1657,7 @@ export default function NewProductPage() {
                     <button
                       type="button"
                       onClick={() => removeRule(index)}
-                      disabled={!canConfigurePricing || rules.length === 1}
+                      disabled={!canConfigurePricing || !hasPricingAttributes}
                       className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
                     >
                       Remove
