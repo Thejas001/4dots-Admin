@@ -5,6 +5,7 @@
 /.next
 /out
 /build
+next-env.d.ts
 
 # cache (kills those webpack/client-development files)
 .next
