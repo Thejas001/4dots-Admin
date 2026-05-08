@@ -81,7 +81,7 @@ const OrderDetail = () => {
             ordersMap.set(order.OrderId, {
               OrderId: order.OrderId,
               Items: [],
-              TotalAmount: 0,
+              TotalAmount: Number(order.TotalAmount || 0),
               OrderStatus: order.OrderStatus,
               CreatedAt: order.CreatedAt || new Date().toISOString(),
               TotalOrders: data.TotalOrders // Add TotalOrders from the API response
@@ -94,7 +94,8 @@ const OrderDetail = () => {
               ProductName: order.ProductName,
               Amount: order.Amount
             });
-            orderSummary.TotalAmount += order.Amount;
+            // Use API-provided order total (amount paid), do not rebuild from line items here.
+            orderSummary.TotalAmount = Number(order.TotalAmount || orderSummary.TotalAmount || 0);
           }
         });
         
