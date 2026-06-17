@@ -38,6 +38,7 @@ type SavedAttribute = {
 
 type ProductPreviewModalProps = {
   productName: string;
+  description?: string;
   attributes: Array<{ name: string; affectsPricing: boolean; values: string[] }>;
   minUploads?: string;
   maxUploads?: string;
@@ -61,6 +62,7 @@ type ProductPreviewModalProps = {
 
 export default function ProductPreviewModal({
   productName,
+  description,
   attributes,
   minUploads,
   maxUploads,
@@ -104,75 +106,81 @@ export default function ProductPreviewModal({
     setQuantity(Number(minOrderQuantity) || 1);
   }, [minOrderQuantity]);
 
-  const uploadMin = Number(minUploads) || 1;
-  const uploadMax = Number(maxUploads) || 9;
-  const qtyMin = Number(minOrderQuantity) || 1;
-  const qtyMax = Number(maxOrderQuantity) || 9999;
+  const uploadMin = minUploads !== undefined && minUploads !== '' ? Number(minUploads) : 1;
+  const uploadMax = maxUploads !== undefined && maxUploads !== '' ? Number(maxUploads) : 9;
+  const uploadMinDisplay = minUploads !== undefined && minUploads !== '' ? minUploads : 'not set';
+  const uploadMaxDisplay = maxUploads !== undefined && maxUploads !== '' ? maxUploads : 'not set';
+  const isUploadInvalid = uploadMinDisplay !== 'not set' && uploadMaxDisplay !== 'not set' && Number(maxUploads) < Number(minUploads);
+
+  const qtyMin = minOrderQuantity !== undefined && minOrderQuantity !== '' ? Number(minOrderQuantity) : 1;
+  const qtyMax = maxOrderQuantity !== undefined && maxOrderQuantity !== '' ? Number(maxOrderQuantity) : 9999;
 
   // Calculate REAL price by matching selections against the saved rules
   const mockBasePrice = useMemo(() => {
-    if (!rules || rules.length === 0 || !savedAttributes || savedAttributes.length === 0) {
-      // Fallback if no rules exist
-      let base = 1200;
-      Object.values(selections).forEach(val => {
-        base += val.length * 10;
-      });
-      return base;
+    if (!rules || rules.length === 0) {
+      return 0;
     }
 
     // Step 1: Map current selections to ValueIDs
     const selectedValueIds = new Set<number>();
     
-    Object.entries(selections).forEach(([attrName, valName]) => {
-      const savedAttr = savedAttributes.find(sa => sa.AttributeName.trim().toLowerCase() === attrName.trim().toLowerCase() && sa.AffectsPricing);
-      if (savedAttr) {
-        const savedVal = savedAttr.AttributeValues.find(v => v.ValueName.trim().toLowerCase() === valName.trim().toLowerCase());
-        if (savedVal) {
-          selectedValueIds.add(savedVal.ValueID);
+    if (savedAttributes && savedAttributes.length > 0) {
+      Object.entries(selections).forEach(([attrName, valName]) => {
+        const savedAttr = savedAttributes.find(sa => sa.AttributeName.trim().toLowerCase() === attrName.trim().toLowerCase() && sa.AffectsPricing);
+        if (savedAttr) {
+          const savedVal = savedAttr.AttributeValues.find(v => v.ValueName.trim().toLowerCase() === valName.trim().toLowerCase());
+          if (savedVal) {
+            selectedValueIds.add(savedVal.ValueID);
+          }
         }
-      }
-    });
+      });
+    }
 
-    // Step 2: Find a rule where all conditions match our selected ValueIDs
-    // A rule matches if EVERY condition in the rule is present in our selectedValueIds
-    // And ideally we want the most specific rule (highest number of conditions matched)
-    let bestMatchRule: RuleDraft | null = null;
-    let maxConditionsMatched = -1;
+    // Step 2: Find all matching rules
+    const matchedRules: Array<{ rule: RuleDraft; matchCount: number }> = [];
 
     for (const rule of rules) {
       if (!rule.unitPrice || isNaN(Number(rule.unitPrice))) continue;
       
       const conditions = rule.conditions || [];
+      const validConditions = conditions.filter(c => c.attributeId !== '' && c.attributeValueId !== '');
       
-      // If rule has 0 conditions, it's a fallback rule
-      if (conditions.length === 0) {
-        if (maxConditionsMatched < 0) {
-          bestMatchRule = rule;
-          maxConditionsMatched = 0;
-        }
+      // If rule has 0 valid conditions, it's a fallback rule
+      if (validConditions.length === 0) {
+        matchedRules.push({ rule, matchCount: 0 });
         continue;
       }
 
       // Check if all conditions are met
-      const validConditions = conditions.filter(c => c.attributeId !== '' && c.attributeValueId !== '');
-      if (validConditions.length === 0) continue;
-
       const allConditionsMet = validConditions.every(c => selectedValueIds.has(c.attributeValueId as number));
       if (allConditionsMet) {
-        // Tie-breaker: prefer rules with MORE matching conditions (more specific)
-        if (validConditions.length > maxConditionsMatched) {
-          bestMatchRule = rule;
-          maxConditionsMatched = validConditions.length;
-        }
+        matchedRules.push({ rule, matchCount: validConditions.length });
       }
     }
 
-    if (bestMatchRule && bestMatchRule.unitPrice) {
-      return Number(bestMatchRule.unitPrice);
+    if (matchedRules.length > 0) {
+      // Sort to find the best match
+      matchedRules.sort((a, b) => {
+        // 1. Compare priority (lower numerical value = higher priority)
+        const priorityA = Number(a.rule.priority) || 999999;
+        const priorityB = Number(b.rule.priority) || 999999;
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        // 2. Tie-breaker: prefer rules with MORE matching conditions (more specific)
+        return b.matchCount - a.matchCount;
+      });
+
+      return Number(matchedRules[0].rule.unitPrice);
     }
 
-    // Fallback if no rule matched
-    return 1200;
+    // If no specific or valid condition matched, check if there's any rule with a unitPrice to use as general fallback
+    const firstRuleWithPrice = rules.find(r => r.unitPrice && !isNaN(Number(r.unitPrice)));
+    if (firstRuleWithPrice) {
+      return Number(firstRuleWithPrice.unitPrice);
+    }
+
+    return 0;
   }, [selections, rules, savedAttributes]);
 
   const estimatedPrice = mockBasePrice * (typeof quantity === 'number' ? quantity : qtyMin);
@@ -193,6 +201,7 @@ export default function ProductPreviewModal({
                 <div>
                   <h2 className="text-[16px] font-bold text-[#1e293b] leading-tight">Preview</h2>
                   <p className="text-[12px] text-slate-500 mt-0.5">{productName || 'Product reference preview'}</p>
+                  {description && <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{description}</p>}
                 </div>
                 <button
                   disabled
@@ -215,8 +224,11 @@ export default function ProductPreviewModal({
                 )}
               </div>
 
-              <div className="bg-[#f8fafc] rounded-xl p-3 text-[12px] text-slate-500 text-center font-medium">
-                Upload required: minimum {uploadMin}, maximum {uploadMax}
+              <div className={`rounded-xl p-3 text-[12px] text-center font-medium ${isUploadInvalid ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-[#f8fafc] text-slate-500'}`}>
+                {isUploadInvalid 
+                  ? `Invalid Policy: Max (${uploadMaxDisplay}) cannot be less than Min (${uploadMinDisplay})`
+                  : `Upload required: minimum ${uploadMinDisplay}, maximum ${uploadMaxDisplay}`
+                }
               </div>
             </div>
           </div>
@@ -345,7 +357,12 @@ export default function ProductPreviewModal({
               <div className="pt-1 space-y-4">
                 <div>
                   <h3 className="text-[13px] font-bold text-[#1e293b] mb-1">Upload Policy</h3>
-                  <p className="text-[12px] text-slate-500 font-medium mb-1">Uploads required: {uploadMin} to {uploadMax}</p>
+                  <p className={`text-[12px] font-medium mb-1 ${isUploadInvalid ? 'text-red-500' : 'text-slate-500'}`}>
+                    {isUploadInvalid
+                      ? `Invalid: Maximum (${uploadMaxDisplay}) < Minimum (${uploadMinDisplay})`
+                      : `Uploads required: ${uploadMinDisplay} to ${uploadMaxDisplay}`
+                    }
+                  </p>
                   {allowedDocs.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {allowedDocs.map(doc => (

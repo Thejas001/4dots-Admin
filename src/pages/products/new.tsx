@@ -1642,7 +1642,7 @@ export default function NewProductPage() {
                       + Add Condition
                     </button>
                   </div>
-                  <div className="md:col-span-4 lg:col-span-3">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {priceType === 0 ? 'Price' : 'Rate per item'}
                     </label>
@@ -1656,7 +1656,7 @@ export default function NewProductPage() {
                       disabled={!canConfigurePricing || !hasCompleteConditions}
                     />
                   </div>
-                  <div className="md:col-span-4 lg:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                     <input
                       type="number"
@@ -2010,6 +2010,7 @@ export default function NewProductPage() {
 
         <ProductPreviewModal
           productName={productName}
+          description={description}
           attributes={attributes}
           minUploads={minUploads}
           maxUploads={maxUploads}

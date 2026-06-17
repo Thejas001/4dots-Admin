@@ -1749,13 +1749,13 @@ export default function EditProductPage() {
                       + Add Condition
                     </button>
                   </div>
-                  <div className="md:col-span-4 lg:col-span-3">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {priceType === 0 ? 'Price' : 'Rate per item'}
                     </label>
                     <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
-                  <div className="md:col-span-4 lg:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                     <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
@@ -2103,6 +2103,7 @@ export default function EditProductPage() {
 
         <ProductPreviewModal
           productName={productName}
+          description={description}
           attributes={attributes}
           minUploads={minUploads}
           maxUploads={maxUploads}
