@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
+import ProductPreviewModal from '@/components/ProductPreviewModal';
 
 type AttributeEditor = {
   name: string;
@@ -164,6 +165,8 @@ export default function NewProductPage() {
   const [uiMode, setUiMode] = useState(1);
   const [productId, setProductId] = useState<number | null>(null);
 
+
+
   const [attributes, setAttributes] = useState<AttributeEditor[]>([]);
   const [attributeNameInput, setAttributeNameInput] = useState('');
   const [selectedAttributeName, setSelectedAttributeName] = useState('');
@@ -287,12 +290,12 @@ export default function NewProductPage() {
 
       const mappedInfo = Array.isArray(res.data?.InfoItems)
         ? res.data.InfoItems.map((item, index) => ({
-            key: `info-${item.ProductInfoItemId || index + 1}`,
-            title: item.Title || '',
-            value: item.Value || '',
-            sortOrder: String(item.SortOrder ?? index + 1),
-            isActive: item.IsActive ?? true,
-          }))
+          key: `info-${item.ProductInfoItemId || index + 1}`,
+          title: item.Title || '',
+          value: item.Value || '',
+          sortOrder: String(item.SortOrder ?? index + 1),
+          isActive: item.IsActive ?? true,
+        }))
         : [];
 
       setInfoItems(
@@ -314,9 +317,9 @@ export default function NewProductPage() {
       const explicitValues = Array.isArray(attribute.AttributeValues) ? attribute.AttributeValues : [];
       const fallbackValues = Array.isArray(attribute.Values)
         ? attribute.Values.map((value, valueIndex) => ({
-            ValueID: valueIndex + 1,
-            ValueName: value,
-          }))
+          ValueID: valueIndex + 1,
+          ValueName: value,
+        }))
         : [];
       return {
         AttributeID: Number(attribute.AttributeID || index + 1),
@@ -351,6 +354,13 @@ export default function NewProductPage() {
     loadMetaConfig(productId);
   }, [productId]);
 
+  const showMessage = (setter: React.Dispatch<React.SetStateAction<string | null>>, msg: string) => {
+    setter(msg);
+    setTimeout(() => {
+      setter(null);
+    }, 3000);
+  };
+
   const handleSaveBasics = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -381,7 +391,7 @@ export default function NewProductPage() {
         if (!createdId) throw new Error('Unable to read product id from create response.');
         setProductId(createdId);
         await loadSavedAttributes(createdId);
-        setBasicsMessage(`Basics saved. Product created with ID ${createdId}.`);
+        showMessage(setBasicsMessage, `Basics saved. Product created with ID ${createdId}.`);
       } else {
         const payload = {
           ProductName: cleanProductName,
@@ -394,7 +404,7 @@ export default function NewProductPage() {
           Addons: [],
         };
         await api.put(`/api/products/${productId}/catalog-config`, payload);
-        setBasicsMessage(`Basics updated for Product ID ${productId}.`);
+        showMessage(setBasicsMessage, `Basics updated for Product ID ${productId}.`);
       }
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -596,7 +606,7 @@ export default function NewProductPage() {
       await api.put(`/api/products/${productId}/catalog-config`, payload);
       await loadSavedAttributes(productId);
       setRules([createEmptyRule(0)]); // IDs can change after replace
-      setAttributesMessage('Attributes and values saved successfully.');
+      showMessage(setAttributesMessage, 'Attributes and values saved successfully.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to save attributes and values.');
@@ -674,9 +684,9 @@ export default function NewProductPage() {
       prev.map((rule, index) =>
         index === ruleIndex
           ? {
-              ...rule,
-              conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
-            }
+            ...rule,
+            conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
+          }
           : rule,
       ),
     );
@@ -868,20 +878,20 @@ export default function NewProductPage() {
         InputDefinitions:
           requiresMultiplier && activeInputKey
             ? [
-                {
-                  InputKey: activeInputKey,
-                  DataType: 0, // Int
-                  IsRequired: true,
-                  MinValue: effectiveMinMultiplier,
-                  MaxValue: effectiveMaxMultiplier,
-                },
-              ]
+              {
+                InputKey: activeInputKey,
+                DataType: 0, // Int
+                IsRequired: true,
+                MinValue: effectiveMinMultiplier,
+                MaxValue: effectiveMaxMultiplier,
+              },
+            ]
             : [],
         Rules: payloadRules,
       };
 
       await api.put(`/api/products/${productId}/pricing-config`, payload);
-      setPricingMessage('Pricing rules saved successfully.');
+      showMessage(setPricingMessage, 'Pricing rules saved successfully.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to save pricing rules.');
@@ -995,7 +1005,7 @@ export default function NewProductPage() {
       };
 
       await api.put(`/api/products/${productId}/meta-config`, payload);
-      setMetaMessage('Upload policy and info items saved successfully.');
+      showMessage(setMetaMessage, 'Upload policy and info items saved successfully.');
       await loadMetaConfig(productId);
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -1061,21 +1071,21 @@ export default function NewProductPage() {
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
+      <div className="space-y-6 px-4 md:px-8 pb-8 pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-gray-900">Create Product</h1>
-            <p className="text-gray-500">
-              Workflow: 1) Basics, 2) Attributes then Values, 3) Pricing Rules.
-            </p>
           </div>
           <Link
             href="/products"
-            className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm"
           >
             Back to Products
           </Link>
         </div>
+
+        <div className="flex items-start gap-6">
+          <div className="flex-1 space-y-6 min-w-0">
 
         <form onSubmit={handleSaveBasics} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -1139,7 +1149,8 @@ export default function NewProductPage() {
             />
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button
               type="submit"
               disabled={savingBasics}
@@ -1152,9 +1163,14 @@ export default function NewProductPage() {
 
         <div className={`space-y-4 rounded-2xl border p-6 shadow-sm ${canConfigureAttributes ? 'border-gray-100 bg-white' : 'border-gray-200 bg-gray-50'}`}>
           <h2 className="text-lg font-semibold text-gray-900">2. Attributes & Values</h2>
-          <p className="text-sm text-gray-600">
-            Add all attributes first. Then pick one attribute and add its values.
-          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-600">
+              Attributes define the different characteristics of your product (e.g., Size, Color, Material).
+            </p>
+            <p className="text-sm text-gray-600">
+              First add an attribute (like &quot;Size&quot;), then select it below and add its values (like &quot;Small&quot;, &quot;Medium&quot;, &quot;Large&quot;).
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1163,7 +1179,7 @@ export default function NewProductPage() {
                 <input
                   value={attributeNameInput}
                   onChange={(e) => setAttributeNameInput(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="Shape"
                   disabled={!canConfigureAttributes}
                 />
@@ -1237,7 +1253,7 @@ export default function NewProductPage() {
               <select
                 value={selectedAttributeName}
                 onChange={(e) => handleAttributeSelectionChange(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                 disabled={!canConfigureAttributes || attributes.length === 0}
               >
                 <option value="">Select attribute</option>
@@ -1252,7 +1268,7 @@ export default function NewProductPage() {
                 <input
                   value={attributeValueInput}
                   onChange={(e) => setAttributeValueInput(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="Matte"
                   disabled={!canConfigureAttributes || !selectedAttributeName}
                 />
@@ -1318,7 +1334,8 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button
               type="button"
               onClick={handleSaveAttributesAndValues}
@@ -1339,9 +1356,8 @@ export default function NewProductPage() {
                       {attribute.AttributeName}{' '}
                       <span className="text-xs font-normal text-gray-500">(AttributeID: {attribute.AttributeID})</span>{' '}
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          attribute.AffectsPricing ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${attribute.AffectsPricing ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                          }`}
                       >
                         {attribute.AffectsPricing ? 'Pricing' : 'Display only'}
                       </span>
@@ -1370,7 +1386,14 @@ export default function NewProductPage() {
 
         <div className={`space-y-4 rounded-2xl border p-6 shadow-sm ${canConfigurePricing ? 'border-gray-100 bg-white' : 'border-gray-200 bg-gray-50'}`}>
           <h2 className="text-lg font-semibold text-gray-900">3. Pricing Rules</h2>
-          <p className="text-sm text-gray-600">Configure pricing only with attributes marked as pricing-relevant.</p>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-600">
+              Pricing rules allow you to change the product&apos;s price based on the selected attributes (e.g., Large size costs more than Small).
+            </p>
+            <p className="text-sm text-gray-600">
+              Only attributes that you marked as &quot;Affects pricing&quot; in the previous section can be used here.
+            </p>
+          </div>
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
             <p className="text-sm font-semibold text-blue-900">How Price Is Calculated</p>
             <p className="mt-1 text-xs text-blue-800">
@@ -1410,7 +1433,7 @@ export default function NewProductPage() {
                 value={priceType}
                 onChange={(e) => setPriceType(Number(e.target.value))}
                 disabled={!canConfigurePricing || !hasPricingAttributes}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50"
               >
                 {PRICE_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -1462,7 +1485,7 @@ export default function NewProductPage() {
                       onChange={(e) => setMultiplierInputKey(e.target.value)}
                       placeholder="Pages / Area / PricingFactor"
                       disabled={!canConfigurePricing || !hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     <p className="mt-1 text-[11px] text-gray-500">
                       Do not use Quantity here. Order quantity is configured in Upload Policy.
@@ -1479,7 +1502,7 @@ export default function NewProductPage() {
                       onChange={(e) => setMinMultiplier(e.target.value)}
                       placeholder="Optional"
                       disabled={!canConfigurePricing || !hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     {pricingValidation.minFactor ? (
                       <p className="mt-1 text-xs text-red-600">{pricingValidation.minFactor}</p>
@@ -1493,7 +1516,7 @@ export default function NewProductPage() {
                       onChange={(e) => setMaxMultiplier(e.target.value)}
                       placeholder="Optional"
                       disabled={!canConfigurePricing || !hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     {pricingValidation.maxFactor ? (
                       <p className="mt-1 text-xs text-red-600">{pricingValidation.maxFactor}</p>
@@ -1517,27 +1540,18 @@ export default function NewProductPage() {
               )}
             </div>
           ) : null}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
-            <div className="mt-2 space-y-1 text-xs">
-              {pricingHealthChecks.map((item) => (
-                <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
-                  {item.valid ? 'PASS' : 'FAIL'}: {item.label}
-                </div>
-              ))}
-            </div>
-          </div>
+
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
-                <button
-                  type="button"
-                  onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])}
-                  disabled={!canConfigurePricing || !hasPricingAttributes}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  + Add Rule
+              <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
+              <button
+                type="button"
+                onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])}
+                disabled={!canConfigurePricing || !hasPricingAttributes}
+                className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                + Add Rule
               </button>
             </div>
             {pricingValidation.rules ? (
@@ -1564,7 +1578,7 @@ export default function NewProductPage() {
 
               return (
                 <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3 bg-white">
-                  <div className="md:col-span-5 space-y-2">
+                  <div className="md:col-span-12 lg:col-span-6 space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Conditions</label>
                     {rule.conditions.map((condition, conditionIndex) => {
                       const selectedAttribute = getAttributeById(condition.attributeId);
@@ -1579,7 +1593,7 @@ export default function NewProductPage() {
                                 attributeId: e.target.value ? Number(e.target.value) : '',
                               })
                             }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                             disabled={!canConfigurePricing || !hasPricingAttributes}
                           >
                             <option value="">Attribute</option>
@@ -1597,7 +1611,7 @@ export default function NewProductPage() {
                                 attributeValueId: e.target.value ? Number(e.target.value) : '',
                               })
                             }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                             disabled={!canConfigurePricing || !hasPricingAttributes || condition.attributeId === ''}
                           >
                             <option value="">Value</option>
@@ -1628,7 +1642,7 @@ export default function NewProductPage() {
                       + Add Condition
                     </button>
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-4 lg:col-span-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {priceType === 0 ? 'Price' : 'Rate per item'}
                     </label>
@@ -1638,22 +1652,22 @@ export default function NewProductPage() {
                       step="0.01"
                       value={rule.unitPrice}
                       onChange={(e) => updateRule(index, { unitPrice: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                       disabled={!canConfigurePricing || !hasCompleteConditions}
                     />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                     <input
                       type="number"
                       min="1"
                       value={rule.priority}
                       onChange={(e) => updateRule(index, { priority: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                       disabled={!canConfigurePricing || !hasCompleteConditions}
                     />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <button
                       type="button"
                       onClick={() => removeRule(index)}
@@ -1675,7 +1689,7 @@ export default function NewProductPage() {
                         ? buildUniqueRuleName(ruleNameTokens, new Set<string>())
                         : 'Select at least one attribute and value'}
                     </p>
-                                        <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500">
                       Selected:{' '}
                       {rule.conditions
                         .map((condition) => {
@@ -1696,7 +1710,21 @@ export default function NewProductPage() {
             })}
           </div>
 
-          <div className="flex justify-end">
+          {multiplierMode === 'manual' && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+              <div className="mt-2 space-y-1 text-xs">
+                {pricingHealthChecks.map((item) => (
+                  <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                    {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3">
+
             <button
               type="button"
               onClick={handleSavePricing}
@@ -1747,7 +1775,7 @@ export default function NewProductPage() {
                 value={minUploads}
                 onChange={(e) => setMinUploads(e.target.value)}
                 disabled={!canConfigureMeta}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
               />
             </div>
             <div>
@@ -1758,10 +1786,23 @@ export default function NewProductPage() {
                 value={maxUploads}
                 onChange={(e) => setMaxUploads(e.target.value)}
                 disabled={!canConfigureMeta}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
               />
             </div>
           </div>
+
+          {multiplierMode === 'upload_count' && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+              <div className="mt-2 space-y-1 text-xs">
+                {pricingHealthChecks.map((item) => (
+                  <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                    {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-gray-100 p-4 space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -1784,7 +1825,7 @@ export default function NewProductPage() {
                   value={minOrderQuantity}
                   onChange={(e) => setMinOrderQuantity(e.target.value)}
                   disabled={!canConfigureMeta || !enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="1"
                 />
               </div>
@@ -1796,7 +1837,7 @@ export default function NewProductPage() {
                   value={maxOrderQuantity}
                   onChange={(e) => setMaxOrderQuantity(e.target.value)}
                   disabled={!canConfigureMeta || !enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="10"
                 />
               </div>
@@ -1838,7 +1879,7 @@ export default function NewProductPage() {
                   onChange={(e) => setCustomDescriptionLabel(e.target.value)}
                   placeholder="Description / Instructions"
                   disabled={!canConfigureMeta || !enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                 />
               </div>
               <div>
@@ -1848,7 +1889,7 @@ export default function NewProductPage() {
                   onChange={(e) => setCustomDescriptionPlaceholder(e.target.value)}
                   placeholder="Add any notes for production (optional)"
                   disabled={!canConfigureMeta || !enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                 />
               </div>
             </div>
@@ -1889,25 +1930,25 @@ export default function NewProductPage() {
             </div>
             {infoItems.map((item) => (
               <div key={item.key} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3">
-                <div className="md:col-span-4">
+                <div className="md:col-span-12 lg:col-span-3">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
                   <input
                     value={item.title}
                     onChange={(e) => updateInfoItem(item.key, { title: e.target.value })}
                     disabled={!canConfigureMeta}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   />
                 </div>
-                <div className="md:col-span-5">
+                <div className="md:col-span-12 lg:col-span-5">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
                   <input
                     value={item.value}
                     onChange={(e) => updateInfoItem(item.key, { value: e.target.value })}
                     disabled={!canConfigureMeta}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   />
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-6 lg:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Sort Order</label>
                   <input
                     type="number"
@@ -1915,10 +1956,10 @@ export default function NewProductPage() {
                     value={item.sortOrder}
                     onChange={(e) => updateInfoItem(item.key, { sortOrder: e.target.value })}
                     disabled={!canConfigureMeta}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   />
                 </div>
-                <div className="md:col-span-1">
+                <div className="md:col-span-6 lg:col-span-2">
                   <button
                     type="button"
                     onClick={() => removeInfoItem(item.key)}
@@ -1932,7 +1973,8 @@ export default function NewProductPage() {
             ))}
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button
               type="button"
               onClick={handleSaveMetaConfig}
@@ -1964,6 +2006,26 @@ export default function NewProductPage() {
         {metaMessage ? (
           <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{metaMessage}</div>
         ) : null}
+        </div>
+
+        <ProductPreviewModal
+          productName={productName}
+          attributes={attributes}
+          minUploads={minUploads}
+          maxUploads={maxUploads}
+          enableOrderQuantity={enableOrderQuantity}
+          minOrderQuantity={minOrderQuantity}
+          maxOrderQuantity={maxOrderQuantity}
+          enableCustomDescription={enableCustomDescription}
+          customDescriptionLabel={customDescriptionLabel}
+          customDescriptionPlaceholder={customDescriptionPlaceholder}
+          documentTypes={documentTypes}
+          allowedDocumentTypeIds={allowedDocumentTypeIds}
+          infoItems={infoItems}
+          rules={rules}
+          savedAttributes={savedAttributes}
+        />
+        </div>
       </div>
     </ProtectedRoute>
   );

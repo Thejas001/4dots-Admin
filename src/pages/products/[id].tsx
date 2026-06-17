@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
+import ProductPreviewModal from '@/components/ProductPreviewModal';
 
 type AttributeEditor = {
   name: string;
@@ -281,6 +282,8 @@ export default function EditProductPage() {
   const productId = Number(idParam);
   const hasValidId = Number.isInteger(productId) && productId > 0;
 
+
+
   const [loading, setLoading] = useState(true);
   const [savingBasics, setSavingBasics] = useState(false);
   const [savingAttributes, setSavingAttributes] = useState(false);
@@ -351,9 +354,9 @@ export default function EditProductPage() {
       const explicitValues = Array.isArray(attribute.AttributeValues) ? attribute.AttributeValues : [];
       const fallbackValues = Array.isArray(attribute.Values)
         ? attribute.Values.map((value, valueIndex) => ({
-            ValueID: valueIndex + 1,
-            ValueName: value,
-          }))
+          ValueID: valueIndex + 1,
+          ValueName: value,
+        }))
         : [];
       return {
         AttributeID: Number(attribute.AttributeID || index + 1),
@@ -423,9 +426,9 @@ export default function EditProductPage() {
                 ? recoveredConditions
                 : ordinalRecoveredConditions.length > 0
                   ? ordinalRecoveredConditions
-                : mappedConditions.length > 0
-                  ? mappedConditions
-                  : [{ attributeId: '', attributeValueId: '' }],
+                  : mappedConditions.length > 0
+                    ? mappedConditions
+                    : [{ attributeId: '', attributeValueId: '' }],
           unitPrice: unitPrice !== undefined && unitPrice !== null ? String(unitPrice) : '',
           priority: priority !== undefined && priority !== null ? String(priority) : String(index + 1),
           priceType: Number(priceType),
@@ -482,12 +485,12 @@ export default function EditProductPage() {
 
       const mappedInfo = Array.isArray(res.data?.InfoItems)
         ? res.data.InfoItems.map((item, index) => ({
-            key: `info-${item.ProductInfoItemId || index + 1}`,
-            title: item.Title || '',
-            value: item.Value || '',
-            sortOrder: String(item.SortOrder ?? index + 1),
-            isActive: item.IsActive ?? true,
-          }))
+          key: `info-${item.ProductInfoItemId || index + 1}`,
+          title: item.Title || '',
+          value: item.Value || '',
+          sortOrder: String(item.SortOrder ?? index + 1),
+          isActive: item.IsActive ?? true,
+        }))
         : [];
 
       setInfoItems(
@@ -539,7 +542,7 @@ export default function EditProductPage() {
       });
       await loadMedia();
       await loadProduct();
-      setMediaMessage(mediaType === 0 ? 'Images uploaded.' : 'Videos uploaded.');
+      showMessage(setMediaMessage, mediaType === 0 ? 'Images uploaded.' : 'Videos uploaded.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to upload media.');
@@ -555,7 +558,7 @@ export default function EditProductPage() {
       await api.put(`/api/products/${productId}/media/${mediaId}/primary`);
       await loadMedia();
       await loadProduct();
-      setMediaMessage('Primary media updated.');
+      showMessage(setMediaMessage, 'Primary media updated.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to update primary media.');
@@ -574,7 +577,7 @@ export default function EditProductPage() {
       await api.delete(`/api/products/${productId}/media/${mediaId}`);
       await loadMedia();
       await loadProduct();
-      setMediaMessage('Media deleted.');
+      showMessage(setMediaMessage, 'Media deleted.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to delete media.');
@@ -655,6 +658,13 @@ export default function EditProductPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, productId]);
 
+  const showMessage = (setter: React.Dispatch<React.SetStateAction<string | null>>, msg: string) => {
+    setter(msg);
+    setTimeout(() => {
+      setter(null);
+    }, 3000);
+  };
+
   const handleSaveBasics = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -675,7 +685,7 @@ export default function EditProductPage() {
         ListingStatus: listingStatus,
         IsEnabled: isEnabled,
       });
-      setBasicsMessage('Basics and status updated.');
+      showMessage(setBasicsMessage, 'Basics and status updated.');
       await loadProduct();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -835,7 +845,7 @@ export default function EditProductPage() {
         Attributes: payloadAttributes,
         Addons: [],
       });
-      setAttributesMessage('Attributes and values updated.');
+      showMessage(setAttributesMessage, 'Attributes and values updated.');
       await loadProduct();
       setRules([createEmptyRule(0)]);
     } catch (err: any) {
@@ -986,9 +996,9 @@ export default function EditProductPage() {
       prev.map((rule, index) =>
         index === ruleIndex
           ? {
-              ...rule,
-              conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
-            }
+            ...rule,
+            conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
+          }
           : rule,
       ),
     );
@@ -1194,18 +1204,18 @@ export default function EditProductPage() {
         InputDefinitions:
           requiresMultiplier && activeInputKey
             ? [
-                {
-                  InputKey: activeInputKey,
-                  DataType: 0, // Int
-                  IsRequired: true,
-                  MinValue: effectiveMinMultiplier,
-                  MaxValue: effectiveMaxMultiplier,
-                },
-              ]
+              {
+                InputKey: activeInputKey,
+                DataType: 0, // Int
+                IsRequired: true,
+                MinValue: effectiveMinMultiplier,
+                MaxValue: effectiveMaxMultiplier,
+              },
+            ]
             : [],
         Rules: payloadRules,
       });
-      setPricingMessage(payloadRules.length === 0 ? 'Pricing rules cleared.' : 'Pricing rules updated.');
+      showMessage(setPricingMessage, payloadRules.length === 0 ? 'Pricing rules cleared.' : 'Pricing rules updated.');
       await loadProduct();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -1315,7 +1325,7 @@ export default function EditProductPage() {
       };
 
       await api.put(`/api/products/${productId}/meta-config`, payload);
-      setMetaMessage('Upload policy and info items updated.');
+      showMessage(setMetaMessage, 'Upload policy and info items updated.');
       await loadMetaConfig();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -1335,27 +1345,30 @@ export default function EditProductPage() {
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
+      <div className="space-y-6 px-4 md:px-8 pb-8 pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-gray-900">Edit Product #{productId}</h1>
             <p className="text-gray-500">Update basics, attributes/values, pricing, and listing status.</p>
           </div>
-          <Link href="/products" className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+          <Link href="/products" className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm">
             Back to Products
           </Link>
         </div>
+
+        <div className="flex items-start gap-6">
+          <div className="flex-1 space-y-6 min-w-0">
 
         <form onSubmit={handleSaveBasics} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Basics & Status</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-              <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+              <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Strategy</label>
-              <select value={pricingStrategy} onChange={(e) => setPricingStrategy(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+              <select value={pricingStrategy} onChange={(e) => setPricingStrategy(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
                 {PRICING_STRATEGIES.map((strategy) => (
                   <option key={strategy.value} value={strategy.value}>{strategy.label}</option>
                 ))}
@@ -1363,7 +1376,7 @@ export default function EditProductPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Product UI Mode</label>
-              <select value={uiMode} onChange={(e) => setUiMode(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+              <select value={uiMode} onChange={(e) => setUiMode(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
                 {UI_MODES.map((mode) => (
                   <option key={mode.value} value={mode.value}>{mode.label}</option>
                 ))}
@@ -1372,12 +1385,12 @@ export default function EditProductPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Listing Status</label>
-              <select value={listingStatus} onChange={(e) => setListingStatus(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+              <select value={listingStatus} onChange={(e) => setListingStatus(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
                 <option value={0}>Draft</option>
                 <option value={1}>Ready For Listing</option>
               </select>
@@ -1389,7 +1402,8 @@ export default function EditProductPage() {
               </label>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button type="submit" disabled={savingBasics} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
               {savingBasics ? 'Saving...' : 'Save Basics'}
             </button>
@@ -1402,7 +1416,7 @@ export default function EditProductPage() {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Add Attribute Name</label>
               <div className="flex gap-2">
-                <input value={attributeNameInput} onChange={(e) => setAttributeNameInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                <input value={attributeNameInput} onChange={(e) => setAttributeNameInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
                 <button type="button" onClick={addAttributeName} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
               </div>
               <div className="space-y-2">
@@ -1448,14 +1462,14 @@ export default function EditProductPage() {
             </div>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Manage Values for Selected Attribute</label>
-              <select value={selectedAttributeName} onChange={(e) => setSelectedAttributeName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+              <select value={selectedAttributeName} onChange={(e) => setSelectedAttributeName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
                 <option value="">Select attribute</option>
                 {attributes.map((attribute) => (
                   <option key={attribute.name} value={attribute.name}>{attribute.name}</option>
                 ))}
               </select>
               <div className="flex gap-2">
-                <input value={attributeValueInput} onChange={(e) => setAttributeValueInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                <input value={attributeValueInput} onChange={(e) => setAttributeValueInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
                 <button type="button" onClick={addValueToSelectedAttribute} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
               </div>
               <div className="space-y-2">
@@ -1500,7 +1514,8 @@ export default function EditProductPage() {
               </div>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button type="button" onClick={handleSaveAttributesAndValues} disabled={savingAttributes} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
               {savingAttributes ? 'Saving...' : 'Save Attributes & Values'}
             </button>
@@ -1538,7 +1553,7 @@ export default function EditProductPage() {
                 value={priceType}
                 onChange={(e) => setPriceType(Number(e.target.value))}
                 disabled={!hasPricingAttributes}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50"
               >
                 {PRICE_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -1589,7 +1604,7 @@ export default function EditProductPage() {
                       onChange={(e) => setMultiplierInputKey(e.target.value)}
                       placeholder="Pages / Area / PricingFactor"
                       disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     <p className="mt-1 text-[11px] text-gray-500">
                       Do not use Quantity here. Order quantity is configured in Upload Policy.
@@ -1606,7 +1621,7 @@ export default function EditProductPage() {
                       onChange={(e) => setMinMultiplier(e.target.value)}
                       placeholder="Optional"
                       disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     {pricingValidation.minFactor ? (
                       <p className="mt-1 text-xs text-red-600">{pricingValidation.minFactor}</p>
@@ -1620,7 +1635,7 @@ export default function EditProductPage() {
                       onChange={(e) => setMaxMultiplier(e.target.value)}
                       placeholder="Optional"
                       disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                     />
                     {pricingValidation.maxFactor ? (
                       <p className="mt-1 text-xs text-red-600">{pricingValidation.maxFactor}</p>
@@ -1644,16 +1659,7 @@ export default function EditProductPage() {
               )}
             </div>
           ) : null}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
-            <div className="mt-2 space-y-1 text-xs">
-              {pricingHealthChecks.map((item) => (
-                <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
-                  {item.valid ? 'PASS' : 'FAIL'}: {item.label}
-                </div>
-              ))}
-            </div>
-          </div>
+
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
@@ -1681,7 +1687,7 @@ export default function EditProductPage() {
                 );
               return (
                 <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3 bg-white">
-                  <div className="md:col-span-5 space-y-2">
+                  <div className="md:col-span-12 lg:col-span-6 space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Conditions</label>
                     {rule.conditions.map((condition, conditionIndex) => {
                       const selectedAttribute = getAttributeById(condition.attributeId);
@@ -1696,7 +1702,7 @@ export default function EditProductPage() {
                                 attributeId: e.target.value ? Number(e.target.value) : '',
                               })
                             }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                             disabled={!hasPricingAttributes}
                           >
                             <option value="">Attribute</option>
@@ -1713,7 +1719,7 @@ export default function EditProductPage() {
                                 attributeValueId: e.target.value ? Number(e.target.value) : '',
                               })
                             }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                             disabled={!hasPricingAttributes || condition.attributeId === ''}
                           >
                             <option value="">Value</option>
@@ -1743,17 +1749,17 @@ export default function EditProductPage() {
                       + Add Condition
                     </button>
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-4 lg:col-span-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {priceType === 0 ? 'Price' : 'Rate per item'}
                     </label>
-                    <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
+                    <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                    <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
+                    <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" disabled={!hasPricingAttributes || !hasCompleteConditions} />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-4 lg:col-span-2">
                     <button type="button" onClick={() => removeRule(index)} disabled={!hasPricingAttributes} className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
                   </div>
                   <div className="md:col-span-12">
@@ -1788,7 +1794,22 @@ export default function EditProductPage() {
               );
             })}
           </div>
-          <div className="flex justify-end">
+
+          {multiplierMode === 'manual' && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+              <div className="mt-2 space-y-1 text-xs">
+                {pricingHealthChecks.map((item) => (
+                  <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                    {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3">
+
             <button type="button" onClick={handleSavePricing} disabled={savingPricing} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
               {savingPricing ? 'Saving...' : 'Save Pricing Rules'}
             </button>
@@ -1915,13 +1936,26 @@ export default function EditProductPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Minimum uploads</label>
-              <input type="number" min="0" value={minUploads} onChange={(e) => setMinUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+              <input type="number" min="0" value={minUploads} onChange={(e) => setMinUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Maximum uploads</label>
-              <input type="number" min="0" value={maxUploads} onChange={(e) => setMaxUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+              <input type="number" min="0" value={maxUploads} onChange={(e) => setMaxUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
             </div>
           </div>
+
+          {multiplierMode === 'upload_count' && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 mt-4">
+              <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+              <div className="mt-2 space-y-1 text-xs">
+                {pricingHealthChecks.map((item) => (
+                  <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                    {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-xl border border-gray-100 p-4 space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               <input
@@ -1941,7 +1975,7 @@ export default function EditProductPage() {
                   value={minOrderQuantity}
                   onChange={(e) => setMinOrderQuantity(e.target.value)}
                   disabled={!enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="1"
                 />
               </div>
@@ -1953,7 +1987,7 @@ export default function EditProductPage() {
                   value={maxOrderQuantity}
                   onChange={(e) => setMaxOrderQuantity(e.target.value)}
                   disabled={!enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                   placeholder="10"
                 />
               </div>
@@ -1993,7 +2027,7 @@ export default function EditProductPage() {
                   onChange={(e) => setCustomDescriptionLabel(e.target.value)}
                   placeholder="Description / Instructions"
                   disabled={!enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                 />
               </div>
               <div>
@@ -2003,7 +2037,7 @@ export default function EditProductPage() {
                   onChange={(e) => setCustomDescriptionPlaceholder(e.target.value)}
                   placeholder="Add any notes for production (optional)"
                   disabled={!enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                 />
               </div>
             </div>
@@ -2034,25 +2068,26 @@ export default function EditProductPage() {
             </div>
             {infoItems.map((item) => (
               <div key={item.key} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3">
-                <div className="md:col-span-4">
+                <div className="md:col-span-12 lg:col-span-3">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-                  <input value={item.title} onChange={(e) => updateInfoItem(item.key, { title: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                  <input value={item.title} onChange={(e) => updateInfoItem(item.key, { title: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
                 </div>
-                <div className="md:col-span-5">
+                <div className="md:col-span-12 lg:col-span-5">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
-                  <input value={item.value} onChange={(e) => updateInfoItem(item.key, { value: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                  <input value={item.value} onChange={(e) => updateInfoItem(item.key, { value: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-6 lg:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Sort Order</label>
-                  <input type="number" min="1" value={item.sortOrder} onChange={(e) => updateInfoItem(item.key, { sortOrder: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                  <input type="number" min="1" value={item.sortOrder} onChange={(e) => updateInfoItem(item.key, { sortOrder: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
                 </div>
-                <div className="md:col-span-1">
+                <div className="md:col-span-6 lg:col-span-2">
                   <button type="button" onClick={() => removeInfoItem(item.key)} disabled={infoItems.length === 1} className="w-full rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+
             <button type="button" onClick={handleSaveMetaConfig} disabled={savingMeta || loadingMeta} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
               {savingMeta ? 'Saving...' : 'Save Upload Policy & Info'}
             </button>
@@ -2064,6 +2099,27 @@ export default function EditProductPage() {
         {attributesMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{attributesMessage}</div>}
         {pricingMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{pricingMessage}</div>}
         {metaMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{metaMessage}</div>}
+        </div>
+
+        <ProductPreviewModal
+          productName={productName}
+          attributes={attributes}
+          minUploads={minUploads}
+          maxUploads={maxUploads}
+          primaryImageUrl={mediaItems.find(m => m.IsPrimary && Number(m.MediaType) === 0)?.MediaUrl}
+          enableOrderQuantity={enableOrderQuantity}
+          minOrderQuantity={minOrderQuantity}
+          maxOrderQuantity={maxOrderQuantity}
+          enableCustomDescription={enableCustomDescription}
+          customDescriptionLabel={customDescriptionLabel}
+          customDescriptionPlaceholder={customDescriptionPlaceholder}
+          documentTypes={documentTypes}
+          allowedDocumentTypeIds={allowedDocumentTypeIds}
+          infoItems={infoItems}
+          rules={rules}
+          savedAttributes={savedAttributes}
+        />
+        </div>
       </div>
     </ProtectedRoute>
   );
