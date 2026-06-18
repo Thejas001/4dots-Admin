@@ -15,15 +15,15 @@ type DocumentTypeOption = {
 };
 
 type RuleDraft = {
-  id: string;
+  id?: string;
   conditions: { attributeId: number | ''; attributeValueId: number | '' }[];
   unitPrice: string;
-  compareAtPrice: string;
-  costPerItem: string;
+  compareAtPrice?: string;
+  costPerItem?: string;
   priority: string;
-  ruleName: string;
-  sku: string;
-  barcode: string;
+  ruleName?: string;
+  sku?: string;
+  barcode?: string;
 };
 
 type SavedAttribute = {
@@ -175,7 +175,11 @@ export default function ProductPreviewModal({
     }
 
     // If no specific or valid condition matched, check if there's any rule with a unitPrice to use as general fallback
-    const firstRuleWithPrice = rules.find(r => r.unitPrice && !isNaN(Number(r.unitPrice)));
+    const firstRuleWithPrice = rules.find(r => {
+      if (!r.unitPrice || isNaN(Number(r.unitPrice))) return false;
+      const validConditions = (r.conditions || []).filter(c => c.attributeId !== '' && c.attributeValueId !== '');
+      return validConditions.length === 0;
+    });
     if (firstRuleWithPrice) {
       return Number(firstRuleWithPrice.unitPrice);
     }
