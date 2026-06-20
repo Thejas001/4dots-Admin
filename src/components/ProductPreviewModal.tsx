@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 type InfoItemDraft = {
   key: string;
@@ -58,6 +59,8 @@ type ProductPreviewModalProps = {
   infoItems?: InfoItemDraft[];
   rules?: RuleDraft[];
   savedAttributes?: SavedAttribute[];
+  isOpenOnMobile?: boolean;
+  onCloseMobile?: () => void;
 };
 
 export default function ProductPreviewModal({
@@ -78,6 +81,8 @@ export default function ProductPreviewModal({
   infoItems,
   rules,
   savedAttributes,
+  isOpenOnMobile,
+  onCloseMobile,
 }: ProductPreviewModalProps) {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState<number | ''>(1);
@@ -187,16 +192,29 @@ export default function ProductPreviewModal({
     return 0;
   }, [selections, rules, savedAttributes]);
 
-  const estimatedPrice = mockBasePrice * (typeof quantity === 'number' ? quantity : qtyMin);
+  const estimatedPrice = quantity === '' ? 0 : mockBasePrice * (typeof quantity === 'number' ? quantity : qtyMin);
 
   const allowedDocs = documentTypes?.filter(d => allowedDocumentTypeIds?.includes(d.DocumentTypeId)) || [];
   const activeInfoItems = infoItems?.filter(i => i.isActive && i.title && i.value) || [];
 
   return (
-    <div className="sticky top-24 w-[680px] shrink-0 h-[calc(100vh-8rem)] z-20 flex flex-col transition-all duration-300">
-      <div className="bg-white rounded-2xl w-full h-full overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col border border-gray-200">
+    <div className={`
+      ${isOpenOnMobile ? 'fixed inset-0 z-[100] flex flex-col bg-white overflow-hidden' : 'hidden xl:flex'}
+      xl:sticky xl:top-24 xl:w-[680px] xl:shrink-0 xl:h-[calc(100vh-8rem)] xl:z-20 xl:flex-col transition-all duration-300
+    `}>
+      {isOpenOnMobile && (
+        <div className="flex xl:hidden items-center justify-between p-4 border-b border-gray-100 shrink-0 bg-white">
+          <h3 className="font-bold text-gray-900">Product Preview</h3>
+          <button onClick={onCloseMobile} className="p-2 -mr-2 text-gray-500 hover:bg-gray-100 rounded-full">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className={`bg-white xl:rounded-2xl w-full h-full overflow-hidden xl:shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col xl:border xl:border-gray-200 ${isOpenOnMobile ? 'flex-1 overflow-y-auto' : ''}`}>
         {/* Content */}
-        <div className="grid grid-cols-2 p-5 gap-5 overflow-y-auto flex-1 hide-scrollbar bg-white items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 p-5 gap-5 overflow-y-auto flex-1 hide-scrollbar bg-white items-start">
           
           {/* Left - Preview Image Card */}
           <div className="w-full">
@@ -298,8 +316,14 @@ export default function ProductPreviewModal({
                       }}
                       onBlur={() => {
                         let val = typeof quantity === 'number' ? quantity : parseInt(quantity as any, 10);
-                        if (isNaN(val) || val < qtyMin) val = qtyMin;
-                        if (val > qtyMax) val = qtyMax;
+                        if (isNaN(val) || val < qtyMin) {
+                          val = qtyMin;
+                          toast.error(`Minimum order quantity is ${qtyMin}`, { position: 'bottom-right' });
+                        }
+                        if (val > qtyMax) {
+                          val = qtyMax;
+                          toast.error(`Maximum order quantity is ${qtyMax}`, { position: 'bottom-right' });
+                        }
                         setQuantity(val);
                       }}
                       className="w-full sm:w-32 px-4 py-2.5 text-[13px] rounded-xl border border-gray-200 text-[#1e293b] bg-white focus:border-[#1e293b] focus:ring-1 focus:ring-[#1e293b] outline-none"
@@ -342,7 +366,7 @@ export default function ProductPreviewModal({
                 {enableOrderQuantity && (
                   <div className="flex justify-between items-center text-[12px]">
                     <span className="text-slate-500 font-medium">Quantity</span>
-                    <span className="font-bold text-[#1e293b]">{quantity}</span>
+                    <span className="font-bold text-[#1e293b]">{quantity === '' ? '-' : quantity}</span>
                   </div>
                 )}
                 {attributes.length === 0 && !enableOrderQuantity && (
