@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import api from '@/lib/axios';
+import ProductPreviewModal from '@/components/ProductPreviewModal';
+import toast, { Toaster } from 'react-hot-toast';
 
 type AttributeEditor = {
   name: string;
@@ -281,6 +283,8 @@ export default function EditProductPage() {
   const productId = Number(idParam);
   const hasValidId = Number.isInteger(productId) && productId > 0;
 
+
+
   const [loading, setLoading] = useState(true);
   const [savingBasics, setSavingBasics] = useState(false);
   const [savingAttributes, setSavingAttributes] = useState(false);
@@ -336,6 +340,7 @@ export default function EditProductPage() {
   const [uploadingImageMedia, setUploadingImageMedia] = useState(false);
   const [uploadingVideoMedia, setUploadingVideoMedia] = useState(false);
   const [mediaMessage, setMediaMessage] = useState<string | null>(null);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
 
   const selectedAttributeEditor = useMemo(
     () => attributes.find((attribute) => attribute.name === selectedAttributeName),
@@ -351,9 +356,9 @@ export default function EditProductPage() {
       const explicitValues = Array.isArray(attribute.AttributeValues) ? attribute.AttributeValues : [];
       const fallbackValues = Array.isArray(attribute.Values)
         ? attribute.Values.map((value, valueIndex) => ({
-            ValueID: valueIndex + 1,
-            ValueName: value,
-          }))
+          ValueID: valueIndex + 1,
+          ValueName: value,
+        }))
         : [];
       return {
         AttributeID: Number(attribute.AttributeID || index + 1),
@@ -423,9 +428,9 @@ export default function EditProductPage() {
                 ? recoveredConditions
                 : ordinalRecoveredConditions.length > 0
                   ? ordinalRecoveredConditions
-                : mappedConditions.length > 0
-                  ? mappedConditions
-                  : [{ attributeId: '', attributeValueId: '' }],
+                  : mappedConditions.length > 0
+                    ? mappedConditions
+                    : [{ attributeId: '', attributeValueId: '' }],
           unitPrice: unitPrice !== undefined && unitPrice !== null ? String(unitPrice) : '',
           priority: priority !== undefined && priority !== null ? String(priority) : String(index + 1),
           priceType: Number(priceType),
@@ -482,12 +487,12 @@ export default function EditProductPage() {
 
       const mappedInfo = Array.isArray(res.data?.InfoItems)
         ? res.data.InfoItems.map((item, index) => ({
-            key: `info-${item.ProductInfoItemId || index + 1}`,
-            title: item.Title || '',
-            value: item.Value || '',
-            sortOrder: String(item.SortOrder ?? index + 1),
-            isActive: item.IsActive ?? true,
-          }))
+          key: `info-${item.ProductInfoItemId || index + 1}`,
+          title: item.Title || '',
+          value: item.Value || '',
+          sortOrder: String(item.SortOrder ?? index + 1),
+          isActive: item.IsActive ?? true,
+        }))
         : [];
 
       setInfoItems(
@@ -539,7 +544,7 @@ export default function EditProductPage() {
       });
       await loadMedia();
       await loadProduct();
-      setMediaMessage(mediaType === 0 ? 'Images uploaded.' : 'Videos uploaded.');
+      showMessage(setMediaMessage, mediaType === 0 ? 'Images uploaded.' : 'Videos uploaded.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to upload media.');
@@ -555,7 +560,7 @@ export default function EditProductPage() {
       await api.put(`/api/products/${productId}/media/${mediaId}/primary`);
       await loadMedia();
       await loadProduct();
-      setMediaMessage('Primary media updated.');
+      showMessage(setMediaMessage, 'Primary media updated.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to update primary media.');
@@ -574,7 +579,7 @@ export default function EditProductPage() {
       await api.delete(`/api/products/${productId}/media/${mediaId}`);
       await loadMedia();
       await loadProduct();
-      setMediaMessage('Media deleted.');
+      showMessage(setMediaMessage, 'Media deleted.');
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
       setError(apiMessage || err?.message || 'Failed to delete media.');
@@ -655,12 +660,20 @@ export default function EditProductPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, productId]);
 
+  const showMessage = (setter: React.Dispatch<React.SetStateAction<string | null>>, msg: string) => {
+    setter(msg);
+    setTimeout(() => {
+      setter(null);
+    }, 3000);
+  };
+
   const handleSaveBasics = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setBasicsMessage(null);
     const cleanName = productName.trim();
     if (!cleanName) {
+      toast.error('Product name is required.', { position: 'bottom-right' });
       setError('Product name is required.');
       return;
     }
@@ -675,7 +688,8 @@ export default function EditProductPage() {
         ListingStatus: listingStatus,
         IsEnabled: isEnabled,
       });
-      setBasicsMessage('Basics and status updated.');
+      showMessage(setBasicsMessage, 'Basics and status updated.');
+      toast.success('Basics and status updated.', { position: 'bottom-right' });
       await loadProduct();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -687,7 +701,10 @@ export default function EditProductPage() {
 
   const addAttributeName = () => {
     const name = attributeNameInput.trim();
-    if (!name) return;
+    if (!name) {
+      toast.error('Attribute name is required.');
+      return;
+    }
     const exists = attributes.some((attribute) => attribute.name.toLowerCase() === name.toLowerCase());
     if (exists) {
       setError(`Attribute '${name}' already exists.`);
@@ -719,6 +736,9 @@ export default function EditProductPage() {
   };
 
   const removeAttributeName = (name: string) => {
+    const confirmed = window.confirm(`Are you sure you want to remove the attribute "${name}"?`);
+    if (!confirmed) return;
+
     const savedAttribute = getSavedAttributeByName(name);
     if (savedAttribute && isAttributeUsedInRules(savedAttribute.AttributeID)) {
       setError(
@@ -737,12 +757,33 @@ export default function EditProductPage() {
 
   const addValueToSelectedAttribute = () => {
     const value = attributeValueInput.trim();
-    if (!selectedAttributeName || !value) return;
+    if (!selectedAttributeName) {
+      toast.error('Please select an attribute first.');
+      return;
+    }
+    if (!value) {
+      toast.error('Attribute value is required.');
+      return;
+    }
+
+    let exists = false;
+    attributes.forEach((attr) => {
+      if (attr.name === selectedAttributeName) {
+        if (attr.values.some((item) => item.toLowerCase() === value.toLowerCase())) {
+          exists = true;
+        }
+      }
+    });
+
+    if (exists) {
+      setError(`Value '${value}' already exists for this attribute.`);
+      return;
+    }
+
+    setError(null);
     setAttributes((prev) =>
       prev.map((attribute) => {
         if (attribute.name !== selectedAttributeName) return attribute;
-        const exists = attribute.values.some((item) => item.toLowerCase() === value.toLowerCase());
-        if (exists) return attribute;
         return { ...attribute, values: [...attribute.values, value] };
       }),
     );
@@ -750,6 +791,9 @@ export default function EditProductPage() {
   };
 
   const removeValueFromSelectedAttribute = (value: string) => {
+    const confirmed = window.confirm(`Are you sure you want to remove the value "${value}"?`);
+    if (!confirmed) return;
+
     if (!selectedAttributeName) return;
     const savedAttribute = getSavedAttributeByName(selectedAttributeName);
     const savedValue = savedAttribute?.AttributeValues.find(
@@ -780,6 +824,7 @@ export default function EditProductPage() {
     setError(null);
     setAttributesMessage(null);
     if (attributes.length === 0) {
+      toast.error('Add at least one attribute.');
       setError('Add at least one attribute.');
       return;
     }
@@ -835,7 +880,8 @@ export default function EditProductPage() {
         Attributes: payloadAttributes,
         Addons: [],
       });
-      setAttributesMessage('Attributes and values updated.');
+      showMessage(setAttributesMessage, 'Attributes and values updated.');
+      toast.success('Attributes and values updated.', { position: 'bottom-right' });
       await loadProduct();
       setRules([createEmptyRule(0)]);
     } catch (err: any) {
@@ -986,9 +1032,9 @@ export default function EditProductPage() {
       prev.map((rule, index) =>
         index === ruleIndex
           ? {
-              ...rule,
-              conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
-            }
+            ...rule,
+            conditions: [...rule.conditions, { attributeId: '', attributeValueId: '' }],
+          }
           : rule,
       ),
     );
@@ -1118,6 +1164,14 @@ export default function EditProductPage() {
       return;
     }
 
+    const rulePriorities = validRules.map((r) => Number(r.priority));
+    const uniquePriorities = new Set(rulePriorities);
+    if (uniquePriorities.size !== rulePriorities.length) {
+      setError('Pricing rules cannot share the same priority. Please assign unique priorities.');
+      setPricingValidation({ rules: 'Pricing rules cannot share the same priority. Please assign unique priorities.' });
+      return;
+    }
+
     const hasDuplicateConditions = validRules.some((rule) => {
       const attributeIds = rule.conditions.map((condition) => condition.attributeId);
       return new Set(attributeIds).size !== attributeIds.length;
@@ -1125,6 +1179,20 @@ export default function EditProductPage() {
     if (hasDuplicateConditions) {
       setError('A rule cannot contain the same attribute more than once.');
       setPricingValidation({ rules: 'A rule cannot contain the same attribute more than once.' });
+      return;
+    }
+
+    const ruleSignatures = validRules.map((rule) => {
+      return rule.conditions
+        .map((c) => `${c.attributeId}:${c.attributeValueId}`)
+        .sort()
+        .join('|');
+    });
+    const uniqueSignatures = new Set(ruleSignatures);
+    if (uniqueSignatures.size !== ruleSignatures.length) {
+      toast.error('You cannot have multiple rules with the exact same combination of attributes and values.', { position: 'bottom-right' });
+      setError('You cannot have multiple rules with the exact same combination of attributes and values.');
+      setPricingValidation({ rules: 'You cannot have multiple rules with the exact same combination of attributes and values.' });
       return;
     }
     const pricingAttributeIdSet = new Set(pricingAttributes.map((attribute) => attribute.AttributeID));
@@ -1194,18 +1262,19 @@ export default function EditProductPage() {
         InputDefinitions:
           requiresMultiplier && activeInputKey
             ? [
-                {
-                  InputKey: activeInputKey,
-                  DataType: 0, // Int
-                  IsRequired: true,
-                  MinValue: effectiveMinMultiplier,
-                  MaxValue: effectiveMaxMultiplier,
-                },
-              ]
+              {
+                InputKey: activeInputKey,
+                DataType: 0, // Int
+                IsRequired: true,
+                MinValue: effectiveMinMultiplier,
+                MaxValue: effectiveMaxMultiplier,
+              },
+            ]
             : [],
         Rules: payloadRules,
       });
-      setPricingMessage(payloadRules.length === 0 ? 'Pricing rules cleared.' : 'Pricing rules updated.');
+      showMessage(setPricingMessage, payloadRules.length === 0 ? 'Pricing rules cleared.' : 'Pricing rules updated.');
+      toast.success(payloadRules.length === 0 ? 'Pricing rules cleared.' : 'Pricing rules updated.', { position: 'bottom-right' });
       await loadProduct();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -1282,14 +1351,17 @@ export default function EditProductPage() {
 
     if (enableOrderQuantity) {
       if (minOrderValue === null || maxOrderValue === null) {
+        toast.error('Min and Max order quantity are required when order quantity is enabled.');
         setError('Min and Max order quantity are required when order quantity is enabled.');
         return;
       }
       if (minOrderValue < 1) {
+        toast.error('Minimum order quantity must be at least 1.');
         setError('Minimum order quantity must be at least 1.');
         return;
       }
       if (maxOrderValue < minOrderValue) {
+        toast.error('Maximum order quantity must be greater than or equal to minimum order quantity.');
         setError('Maximum order quantity must be greater than or equal to minimum order quantity.');
         return;
       }
@@ -1315,7 +1387,7 @@ export default function EditProductPage() {
       };
 
       await api.put(`/api/products/${productId}/meta-config`, payload);
-      setMetaMessage('Upload policy and info items updated.');
+      showMessage(setMetaMessage, 'Upload policy and info items updated.');
       await loadMetaConfig();
     } catch (err: any) {
       const apiMessage = err?.response?.data?.message || err?.response?.data?.Message;
@@ -1324,6 +1396,12 @@ export default function EditProductPage() {
       setSavingMeta(false);
     }
   };
+
+  const duplicatePriorities = useMemo(() => {
+    const priorities = rules.map(r => r.priority).filter(p => p !== '');
+    const duplicates = priorities.filter((item, index) => priorities.indexOf(item) !== index);
+    return new Set(duplicates);
+  }, [rules]);
 
   if (loading) {
     return (
@@ -1335,736 +1413,825 @@ export default function EditProductPage() {
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
+      <div className="space-y-6 pb-8">
+        <div className="sticky top-[52px] sm:top-[60px] z-30 flex items-center justify-between gap-4 bg-gray-100 py-4 -mx-6 px-6 border-b border-gray-200 shadow-sm mb-6 -mt-6">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-gray-900">Edit Product #{productId}</h1>
-            <p className="text-gray-500">Update basics, attributes/values, pricing, and listing status.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Edit Product #{productId}</h1>
+            <p className="text-xs sm:text-sm text-gray-500">Update basics, attributes/values, pricing, and listing status.</p>
           </div>
-          <Link href="/products" className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+          <Link href="/products" className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm">
             Back to Products
           </Link>
         </div>
 
-        <form onSubmit={handleSaveBasics} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Basics & Status</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-              <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Strategy</label>
-              <select value={pricingStrategy} onChange={(e) => setPricingStrategy(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
-                {PRICING_STRATEGIES.map((strategy) => (
-                  <option key={strategy.value} value={strategy.value}>{strategy.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Product UI Mode</label>
-              <select value={uiMode} onChange={(e) => setUiMode(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
-                {UI_MODES.map((mode) => (
-                  <option key={mode.value} value={mode.value}>{mode.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Listing Status</label>
-              <select value={listingStatus} onChange={(e) => setListingStatus(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
-                <option value={0}>Draft</option>
-                <option value={1}>Ready For Listing</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={isEnabled} onChange={(e) => setIsEnabled(e.target.checked)} className="rounded border-gray-300" />
-                Enabled for end users
-              </label>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button type="submit" disabled={savingBasics} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              {savingBasics ? 'Saving...' : 'Save Basics'}
-            </button>
-          </div>
-        </form>
+        <div className="flex items-start gap-6">
+          <div className="flex-1 space-y-6 min-w-0">
 
-        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Attributes & Values</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Add Attribute Name</label>
-              <div className="flex gap-2">
-                <input value={attributeNameInput} onChange={(e) => setAttributeNameInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                <button type="button" onClick={addAttributeName} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
+            <form onSubmit={handleSaveBasics} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Basics & Status</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                  <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Strategy</label>
+                  <select value={pricingStrategy} onChange={(e) => setPricingStrategy(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
+                    {PRICING_STRATEGIES.map((strategy) => (
+                      <option key={strategy.value} value={strategy.value}>{strategy.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product UI Mode</label>
+                  <select value={uiMode} onChange={(e) => setUiMode(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
+                    {UI_MODES.map((mode) => (
+                      <option key={mode.value} value={mode.value}>{mode.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-2">
-                {attributes.map((attribute) => (
-                  <div key={attribute.name} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => setSelectedAttributeName(attribute.name)} className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}>{attribute.name}</button>
-                      <label className="inline-flex items-center gap-1 text-[11px] text-gray-600">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Listing Status</label>
+                  <select value={listingStatus} onChange={(e) => setListingStatus(Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
+                    <option value={0}>Draft</option>
+                    <option value={1}>Ready For Listing</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={isEnabled} onChange={(e) => setIsEnabled(e.target.checked)} className="rounded border-gray-300" />
+                    Enabled for end users
+                  </label>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end items-center gap-3">
+                {basicsMessage && <span className="text-sm font-medium text-green-600">{basicsMessage}</span>}
+
+                <button type="submit" disabled={savingBasics} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {savingBasics ? 'Saving...' : 'Save Basics'}
+                </button>
+              </div>
+            </form>
+
+            <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Attributes & Values</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Add Attribute Name</label>
+                  <div className="flex gap-2">
+                    <input value={attributeNameInput} onChange={(e) => setAttributeNameInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    <button type="button" onClick={addAttributeName} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
+                  </div>
+                  <div className="space-y-2">
+                    {attributes.map((attribute) => (
+                      <div key={attribute.name} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setSelectedAttributeName(attribute.name)} className={`text-sm font-medium ${selectedAttributeName === attribute.name ? 'text-blue-700' : 'text-gray-700'}`}>{attribute.name}</button>
+                          <label className="inline-flex items-center gap-1 text-[11px] text-gray-600">
+                            <input
+                              type="checkbox"
+                              checked={attribute.affectsPricing}
+                              onChange={(e) => toggleAttributeAffectsPricing(attribute.name, e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            Affects pricing
+                          </label>
+                          {(() => {
+                            const savedAttribute = getSavedAttributeByName(attribute.name);
+                            const usageCount = savedAttribute ? getAttributeRuleUsageCount(savedAttribute.AttributeID) : 0;
+                            if (usageCount <= 0) return null;
+                            return (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAttributeName(attribute.name)}
+                          className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                          disabled={(() => {
+                            const savedAttribute = getSavedAttributeByName(attribute.name);
+                            if (!savedAttribute) return false;
+                            return getAttributeRuleUsageCount(savedAttribute.AttributeID) > 0;
+                          })()}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Manage Values for Selected Attribute</label>
+                  <select value={selectedAttributeName} onChange={(e) => setSelectedAttributeName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all">
+                    <option value="">Select attribute</option>
+                    {attributes.map((attribute) => (
+                      <option key={attribute.name} value={attribute.name}>{attribute.name}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <input value={attributeValueInput} onChange={(e) => setAttributeValueInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    <button type="button" onClick={addValueToSelectedAttribute} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedAttributeEditor?.values.map((value) => (
+                      <div key={value} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-700">{value}</span>
+                          {(() => {
+                            const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                            const savedValue = savedAttribute?.AttributeValues.find(
+                              (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                            );
+                            const usageCount =
+                              savedAttribute && savedValue
+                                ? getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID)
+                                : 0;
+                            if (usageCount <= 0) return null;
+                            return (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeValueFromSelectedAttribute(value)}
+                          className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
+                          disabled={(() => {
+                            const savedAttribute = getSavedAttributeByName(selectedAttributeName);
+                            const savedValue = savedAttribute?.AttributeValues.find(
+                              (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
+                            );
+                            if (!savedAttribute || !savedValue) return false;
+                            return getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID) > 0;
+                          })()}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end items-center gap-3">
+                {attributesMessage && <span className="text-sm font-medium text-green-600">{attributesMessage}</span>}
+
+                <button type="button" onClick={handleSaveAttributesAndValues} disabled={savingAttributes} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {savingAttributes ? 'Saving...' : 'Save Attributes & Values'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Pricing Rules</h2>
+              <p className="text-sm text-gray-600">Configure pricing only with attributes marked as pricing-relevant.</p>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <p className="text-sm font-semibold text-blue-900">How Price Is Calculated</p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Final price = Unit Price x Quantity x Pricing Factor
+                </p>
+                <p className="mt-1 text-xs text-blue-700">
+                  Example: {sampleUnitPrice} x {sampleQuantity} x {samplePricingFactor} = {sampleTotal}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
+                Pricing attributes: {pricingAttributes.length} | Non-pricing attributes: {nonPricingAttributes.length}
+              </div>
+              {!hasPricingAttributes ? (
+                <p className="text-sm text-amber-700">
+                  No pricing attributes are configured. You can skip pricing rules for this product.
+                </p>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <input id="replace-rules" type="checkbox" checked={replaceRules} onChange={(e) => setReplaceRules(e.target.checked)} className="rounded border-gray-300" />
+                <label htmlFor="replace-rules" className="text-sm text-gray-700">Replace existing rules on save</label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Price Type</label>
+                  <select
+                    value={priceType}
+                    onChange={(e) => setPriceType(Number(e.target.value))}
+                    disabled={!hasPricingAttributes}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all disabled:opacity-50"
+                  >
+                    {PRICE_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  {pricingValidation.priceType ? (
+                    <p className="mt-1 text-xs text-red-600">{pricingValidation.priceType}</p>
+                  ) : null}
+                </div>
+              </div>
+              {priceType !== 0 ? (
+                <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-sm font-medium text-gray-800">Pricing Factor Source</p>
+                  <p className="text-xs text-gray-600">
+                    This is an additional factor beyond order quantity. Final price = unit price x quantity x pricing factor.
+                    Example: unit 100, order qty 2, pricing factor 3 = total 600.
+                    Choose <span className="font-medium">Number of uploads</span> when each uploaded file should add to pricing.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        checked={multiplierMode === 'manual'}
+                        onChange={() => setMultiplierMode('manual')}
+                        disabled={!hasPricingAttributes}
+                      />
+                      Manual pricing factor
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        checked={multiplierMode === 'upload_count'}
+                        onChange={() => setMultiplierMode('upload_count')}
+                        disabled={!hasPricingAttributes}
+                      />
+                      Number of uploads
+                    </label>
+                  </div>
+
+                  {multiplierMode === 'manual' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Pricing Factor Input</label>
                         <input
-                          type="checkbox"
-                          checked={attribute.affectsPricing}
-                          onChange={(e) => toggleAttributeAffectsPricing(attribute.name, e.target.checked)}
-                          className="rounded border-gray-300"
+                          value={multiplierInputKey}
+                          onChange={(e) => setMultiplierInputKey(e.target.value)}
+                          placeholder="Pages / Area / PricingFactor"
+                          disabled={!hasPricingAttributes}
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                         />
-                        Affects pricing
-                      </label>
-                      {(() => {
-                        const savedAttribute = getSavedAttributeByName(attribute.name);
-                        const usageCount = savedAttribute ? getAttributeRuleUsageCount(savedAttribute.AttributeID) : 0;
-                        if (usageCount <= 0) return null;
-                        return (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                            Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
-                          </span>
-                        );
-                      })()}
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          Do not use Quantity here. Order quantity is configured in Upload Policy.
+                        </p>
+                        {pricingValidation.factorInput ? (
+                          <p className="mt-1 text-xs text-red-600">{pricingValidation.factorInput}</p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Minimum Pricing Factor</label>
+                        <input
+                          type="number"
+                          value={minMultiplier}
+                          onChange={(e) => setMinMultiplier(e.target.value)}
+                          placeholder="Optional"
+                          disabled={!hasPricingAttributes}
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                        />
+                        {pricingValidation.minFactor ? (
+                          <p className="mt-1 text-xs text-red-600">{pricingValidation.minFactor}</p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Maximum Pricing Factor</label>
+                        <input
+                          type="number"
+                          value={maxMultiplier}
+                          onChange={(e) => setMaxMultiplier(e.target.value)}
+                          placeholder="Optional"
+                          disabled={!hasPricingAttributes}
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                        />
+                        {pricingValidation.maxFactor ? (
+                          <p className="mt-1 text-xs text-red-600">{pricingValidation.maxFactor}</p>
+                        ) : null}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeAttributeName(attribute.name)}
-                      className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
-                      disabled={(() => {
-                        const savedAttribute = getSavedAttributeByName(attribute.name);
-                        if (!savedAttribute) return false;
-                        return getAttributeRuleUsageCount(savedAttribute.AttributeID) > 0;
-                      })()}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Manage Values for Selected Attribute</label>
-              <select value={selectedAttributeName} onChange={(e) => setSelectedAttributeName(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
-                <option value="">Select attribute</option>
-                {attributes.map((attribute) => (
-                  <option key={attribute.name} value={attribute.name}>{attribute.name}</option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <input value={attributeValueInput} onChange={(e) => setAttributeValueInput(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                <button type="button" onClick={addValueToSelectedAttribute} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Add</button>
-              </div>
-              <div className="space-y-2">
-                {selectedAttributeEditor?.values.map((value) => (
-                  <div key={value} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-700">{value}</span>
-                      {(() => {
-                        const savedAttribute = getSavedAttributeByName(selectedAttributeName);
-                        const savedValue = savedAttribute?.AttributeValues.find(
-                          (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
-                        );
-                        const usageCount =
-                          savedAttribute && savedValue
-                            ? getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID)
-                            : 0;
-                        if (usageCount <= 0) return null;
-                        return (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                            Used in {usageCount} rule{usageCount > 1 ? 's' : ''}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeValueFromSelectedAttribute(value)}
-                      className="text-xs font-medium text-red-700 hover:text-red-800 disabled:opacity-50"
-                      disabled={(() => {
-                        const savedAttribute = getSavedAttributeByName(selectedAttributeName);
-                        const savedValue = savedAttribute?.AttributeValues.find(
-                          (item) => item.ValueName.trim().toLowerCase() === value.trim().toLowerCase(),
-                        );
-                        if (!savedAttribute || !savedValue) return false;
-                        return getAttributeValueRuleUsageCount(savedAttribute.AttributeID, savedValue.ValueID) > 0;
-                      })()}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button type="button" onClick={handleSaveAttributesAndValues} disabled={savingAttributes} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              {savingAttributes ? 'Saving...' : 'Save Attributes & Values'}
-            </button>
-          </div>
-        </div>
+                  ) : (
+                    <>
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        Linked to Upload Policy: upload count is used as the pricing factor input.
+                      </div>
+                      <div className="text-xs text-gray-700">
+                        Uses upload count from meta config as pricing factor input <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
+                        Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
+                        <span className="font-semibold">{maxUploads || 'not set'}</span>.
+                      </div>
+                      {pricingValidation.uploadPolicy ? (
+                        <p className="text-xs text-red-600">{pricingValidation.uploadPolicy}</p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
 
-        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Pricing Rules</h2>
-          <p className="text-sm text-gray-600">Configure pricing only with attributes marked as pricing-relevant.</p>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-            <p className="text-sm font-semibold text-blue-900">How Price Is Calculated</p>
-            <p className="mt-1 text-xs text-blue-800">
-              Final price = Unit Price x Quantity x Pricing Factor
-            </p>
-            <p className="mt-1 text-xs text-blue-700">
-              Example: {sampleUnitPrice} x {sampleQuantity} x {samplePricingFactor} = {sampleTotal}
-            </p>
-          </div>
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
-            Pricing attributes: {pricingAttributes.length} | Non-pricing attributes: {nonPricingAttributes.length}
-          </div>
-          {!hasPricingAttributes ? (
-            <p className="text-sm text-amber-700">
-              No pricing attributes are configured. You can skip pricing rules for this product.
-            </p>
-          ) : null}
-          <div className="flex items-center gap-2">
-            <input id="replace-rules" type="checkbox" checked={replaceRules} onChange={(e) => setReplaceRules(e.target.checked)} className="rounded border-gray-300" />
-            <label htmlFor="replace-rules" className="text-sm text-gray-700">Replace existing rules on save</label>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price Type</label>
-              <select
-                value={priceType}
-                onChange={(e) => setPriceType(Number(e.target.value))}
-                disabled={!hasPricingAttributes}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm disabled:opacity-50"
-              >
-                {PRICE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-              {pricingValidation.priceType ? (
-                <p className="mt-1 text-xs text-red-600">{pricingValidation.priceType}</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
+                  <button type="button" onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])} disabled={!hasPricingAttributes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">+ Add Rule</button>
+                </div>
+                {pricingValidation.rules ? (
+                  <p className="text-xs text-red-600">{pricingValidation.rules}</p>
+                ) : null}
+                {rules.map((rule, index) => {
+                  const ruleNameTokens = rule.conditions
+                    .map((condition) => {
+                      if (condition.attributeId === '' || condition.attributeValueId === '') return null;
+                      const attribute = getAttributeById(condition.attributeId);
+                      const value = attribute?.AttributeValues.find(
+                        (item) => item.ValueID === condition.attributeValueId,
+                      );
+                      if (!attribute || !value) return null;
+                      return `${attribute.AttributeName}_${value.ValueName}`;
+                    })
+                    .filter((token): token is string => Boolean(token));
+                  const hasCompleteConditions =
+                    rule.conditions.length > 0 &&
+                    rule.conditions.every(
+                      (condition) => condition.attributeId !== '' && condition.attributeValueId !== '',
+                    );
+                  return (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3 bg-white">
+                      <div className="md:col-span-12 lg:col-span-6 space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">Conditions</label>
+                        {rule.conditions.map((condition, conditionIndex) => {
+                          const selectedAttribute = getAttributeById(condition.attributeId);
+                          const valueOptions = selectedAttribute?.AttributeValues || [];
+
+                          return (
+                            <div key={conditionIndex} className="flex flex-wrap items-start gap-2">
+                              <div className="flex-1 min-w-[140px]">
+                                <select
+                                  value={condition.attributeId}
+                                  onChange={(e) =>
+                                    updateRuleCondition(index, conditionIndex, {
+                                      attributeId: e.target.value ? Number(e.target.value) : '',
+                                    })
+                                  }
+                                  className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-4 transition-all ${
+                                    pricingValidation.rules && condition.attributeId === ''
+                                      ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-500/10'
+                                      : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/10'
+                                  }`}
+                                  disabled={!hasPricingAttributes}
+                                >
+                                  <option value="">Attribute</option>
+                                  {pricingAttributes.map((attribute) => (
+                                    <option key={attribute.AttributeID} value={attribute.AttributeID}>
+                                      {attribute.AttributeName}
+                                    </option>
+                                  ))}
+                                </select>
+                                {pricingValidation.rules && condition.attributeId === '' ? (
+                                  <p className="mt-1 text-[11px] text-red-600 font-medium">Please select an attribute.</p>
+                                ) : null}
+                              </div>
+                              <div className="flex-1 min-w-[140px]">
+                                <select
+                                  value={condition.attributeValueId}
+                                  onChange={(e) =>
+                                    updateRuleCondition(index, conditionIndex, {
+                                      attributeValueId: e.target.value ? Number(e.target.value) : '',
+                                    })
+                                  }
+                                  className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-4 transition-all ${
+                                    pricingValidation.rules && condition.attributeId !== '' && condition.attributeValueId === ''
+                                      ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-500/10'
+                                      : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/10'
+                                  }`}
+                                  disabled={!hasPricingAttributes || condition.attributeId === ''}
+                                >
+                                  <option value="">Value</option>
+                                  {valueOptions.map((value) => (
+                                    <option key={value.ValueID} value={value.ValueID}>
+                                      {value.ValueName}
+                                    </option>
+                                  ))}
+                                </select>
+                                {pricingValidation.rules && condition.attributeId !== '' && condition.attributeValueId === '' ? (
+                                  <p className="mt-1 text-[11px] text-red-600 font-medium">Please select a value.</p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeConditionFromRule(index, conditionIndex)}
+                                disabled={rule.conditions.length === 1}
+                                className="rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 mt-0.5"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => addConditionToRule(index)}
+                          className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          disabled={!hasPricingAttributes}
+                        >
+                          + Add Condition
+                        </button>
+                      </div>
+                      <div className="md:col-span-4 lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {priceType === 0 ? 'Price' : 'Rate per item'}
+                        </label>
+                        <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-4 transition-all ${
+                            pricingValidation.rules && rule.unitPrice === ''
+                              ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-500/10'
+                              : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/10'
+                          }`} disabled={!hasPricingAttributes || !hasCompleteConditions} />
+                        {pricingValidation.rules && rule.unitPrice === '' ? (
+                          <p className="mt-1 text-[11px] text-red-600 font-medium">Please specify the price.</p>
+                        ) : null}
+                      </div>
+                      <div className="md:col-span-4 lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" disabled={!hasPricingAttributes || !hasCompleteConditions} />
+                      </div>
+                      <div className="md:col-span-4 lg:col-span-2">
+                        <button type="button" onClick={() => removeRule(index)} disabled={!hasPricingAttributes} className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
+                      </div>
+                      <div className="md:col-span-12">
+                        {!hasCompleteConditions ? (
+                          <p className="text-xs text-amber-700">
+                            Complete selected pricing-attribute conditions first, then set unit price.
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-gray-500">
+                          Rule Name (auto):{' '}
+                          {ruleNameTokens.length > 0
+                            ? buildUniqueRuleName(ruleNameTokens, new Set<string>())
+                            : 'Select at least one attribute and value'}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Selected:{' '}
+                          {rule.conditions
+                            .map((condition) => {
+                              if (condition.attributeId === '' || condition.attributeValueId === '') return null;
+                              const attribute = getAttributeById(condition.attributeId);
+                              const value = attribute?.AttributeValues.find(
+                                (item) => item.ValueID === condition.attributeValueId,
+                              );
+                              if (!attribute || !value) return null;
+                              return `${attribute.AttributeName}: ${value.ValueName}`;
+                            })
+                            .filter((item): item is string => Boolean(item))
+                            .join(', ') || 'No conditions selected'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {multiplierMode === 'manual' && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    {pricingHealthChecks.map((item) => (
+                      <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                        {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap justify-end items-center gap-3">
+                {pricingMessage && <span className="text-sm font-medium text-green-600">{pricingMessage}</span>}
+
+                <button type="button" onClick={handleSavePricing} disabled={savingPricing} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {savingPricing ? 'Saving...' : 'Save Pricing Rules'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Product Media</h2>
+              {canManageMedia ? (
+                <>
+                  <p className="text-sm text-gray-600">
+                    Upload multiple images and videos for Generic Matrix products.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-gray-100 p-4 space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">Upload Images</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => uploadMediaFiles(e.target.files, 0)}
+                        className="w-full text-sm"
+                        disabled={uploadingImageMedia || loadingMedia}
+                      />
+                      <p className="text-xs text-gray-500">JPEG, PNG, WEBP and other image mime types.</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 p-4 space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">Upload Videos</label>
+                      <input
+                        type="file"
+                        accept="video/*"
+                        multiple
+                        onChange={(e) => uploadMediaFiles(e.target.files, 1)}
+                        className="w-full text-sm"
+                        disabled={uploadingVideoMedia || loadingMedia}
+                      />
+                      <p className="text-xs text-gray-500">MP4, MOV and other video mime types.</p>
+                    </div>
+                  </div>
+
+                  {loadingMedia ? (
+                    <p className="text-sm text-gray-500">Loading media...</p>
+                  ) : mediaItems.length === 0 ? (
+                    <p className="text-sm text-gray-500">No media uploaded yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {mediaItems.map((item) => {
+                        const isImage = Number(item.MediaType) === 0;
+                        return (
+                          <div key={item.ProductMediaId} className="rounded-xl border border-gray-100 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-medium text-gray-800">
+                                {isImage ? 'Image' : 'Video'} {item.IsPrimary ? '(Primary)' : ''}
+                              </div>
+                              <div className="text-xs text-gray-500">Sort: {item.SortOrder}</div>
+                            </div>
+                            {isImage ? (
+                              <img
+                                src={item.MediaUrl}
+                                alt={item.FileName || 'Product media'}
+                                className="h-40 w-full rounded-lg object-cover border border-gray-200"
+                              />
+                            ) : (
+                              <video
+                                src={item.MediaUrl}
+                                controls
+                                className="h-40 w-full rounded-lg border border-gray-200 bg-black"
+                              />
+                            )}
+                            <div className="text-xs text-gray-600 truncate" title={item.FileName || ''}>
+                              {item.FileName || 'Unnamed file'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!item.IsPrimary ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPrimaryMedia(item.ProductMediaId)}
+                                  className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                                >
+                                  Set Primary
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => deleteMedia(item.ProductMediaId, item.FileName)}
+                                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-amber-700">
+                  Media management is available only for products with Pricing Strategy = Generic Matrix (0).
+                </p>
+              )}
+              {mediaMessage ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {mediaMessage}
+                </div>
               ) : null}
             </div>
-          </div>
-          {priceType !== 0 ? (
-            <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-800">Pricing Factor Source</p>
-              <p className="text-xs text-gray-600">
-                This is an additional factor beyond order quantity. Final price = unit price x quantity x pricing factor.
-                Example: unit 100, order qty 2, pricing factor 3 = total 600.
-                Choose <span className="font-medium">Number of uploads</span> when each uploaded file should add to pricing.
-              </p>
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    checked={multiplierMode === 'manual'}
-                    onChange={() => setMultiplierMode('manual')}
-                    disabled={!hasPricingAttributes}
-                  />
-                  Manual pricing factor
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    checked={multiplierMode === 'upload_count'}
-                    onChange={() => setMultiplierMode('upload_count')}
-                    disabled={!hasPricingAttributes}
-                  />
-                  Number of uploads
-                </label>
-              </div>
 
-              {multiplierMode === 'manual' ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Pricing Factor Input</label>
-                    <input
-                      value={multiplierInputKey}
-                      onChange={(e) => setMultiplierInputKey(e.target.value)}
-                      placeholder="Pages / Area / PricingFactor"
-                      disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      Do not use Quantity here. Order quantity is configured in Upload Policy.
-                    </p>
-                    {pricingValidation.factorInput ? (
-                      <p className="mt-1 text-xs text-red-600">{pricingValidation.factorInput}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Minimum Pricing Factor</label>
-                    <input
-                      type="number"
-                      value={minMultiplier}
-                      onChange={(e) => setMinMultiplier(e.target.value)}
-                      placeholder="Optional"
-                      disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    {pricingValidation.minFactor ? (
-                      <p className="mt-1 text-xs text-red-600">{pricingValidation.minFactor}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Maximum Pricing Factor</label>
-                    <input
-                      type="number"
-                      value={maxMultiplier}
-                      onChange={(e) => setMaxMultiplier(e.target.value)}
-                      placeholder="Optional"
-                      disabled={!hasPricingAttributes}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    {pricingValidation.maxFactor ? (
-                      <p className="mt-1 text-xs text-red-600">{pricingValidation.maxFactor}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    Linked to Upload Policy: upload count is used as the pricing factor input.
-                  </div>
-                  <div className="text-xs text-gray-700">
-                    Uses upload count from meta config as pricing factor input <span className="font-semibold">{UPLOAD_COUNT_INPUT_KEY}</span>.
-                    Current upload policy bounds: min <span className="font-semibold">{minUploads || '0'}</span>, max{' '}
-                    <span className="font-semibold">{maxUploads || 'not set'}</span>.
-                  </div>
-                  {pricingValidation.uploadPolicy ? (
-                    <p className="text-xs text-red-600">{pricingValidation.uploadPolicy}</p>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : null}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
-            <div className="mt-2 space-y-1 text-xs">
-              {pricingHealthChecks.map((item) => (
-                <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
-                  {item.valid ? 'PASS' : 'FAIL'}: {item.label}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Rule List</h3>
-              <button type="button" onClick={() => setRules((prev) => [...prev, createEmptyRule(prev.length)])} disabled={!hasPricingAttributes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">+ Add Rule</button>
-            </div>
-            {pricingValidation.rules ? (
-              <p className="text-xs text-red-600">{pricingValidation.rules}</p>
-            ) : null}
-            {rules.map((rule, index) => {
-              const ruleNameTokens = rule.conditions
-                .map((condition) => {
-                  if (condition.attributeId === '' || condition.attributeValueId === '') return null;
-                  const attribute = getAttributeById(condition.attributeId);
-                  const value = attribute?.AttributeValues.find(
-                    (item) => item.ValueID === condition.attributeValueId,
-                  );
-                  if (!attribute || !value) return null;
-                  return `${attribute.AttributeName}_${value.ValueName}`;
-                })
-                .filter((token): token is string => Boolean(token));
-              const hasCompleteConditions =
-                rule.conditions.length > 0 &&
-                rule.conditions.every(
-                  (condition) => condition.attributeId !== '' && condition.attributeValueId !== '',
-                );
-              return (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3 bg-white">
-                  <div className="md:col-span-5 space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Conditions</label>
-                    {rule.conditions.map((condition, conditionIndex) => {
-                      const selectedAttribute = getAttributeById(condition.attributeId);
-                      const valueOptions = selectedAttribute?.AttributeValues || [];
-
-                      return (
-                        <div key={conditionIndex} className="flex flex-wrap items-center gap-2">
-                          <select
-                            value={condition.attributeId}
-                            onChange={(e) =>
-                              updateRuleCondition(index, conditionIndex, {
-                                attributeId: e.target.value ? Number(e.target.value) : '',
-                              })
-                            }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                            disabled={!hasPricingAttributes}
-                          >
-                            <option value="">Attribute</option>
-                            {pricingAttributes.map((attribute) => (
-                              <option key={attribute.AttributeID} value={attribute.AttributeID}>
-                                {attribute.AttributeName}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            value={condition.attributeValueId}
-                            onChange={(e) =>
-                              updateRuleCondition(index, conditionIndex, {
-                                attributeValueId: e.target.value ? Number(e.target.value) : '',
-                              })
-                            }
-                            className="min-w-[140px] flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                            disabled={!hasPricingAttributes || condition.attributeId === ''}
-                          >
-                            <option value="">Value</option>
-                            {valueOptions.map((value) => (
-                              <option key={value.ValueID} value={value.ValueID}>
-                                {value.ValueName}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => removeConditionFromRule(index, conditionIndex)}
-                            disabled={rule.conditions.length === 1}
-                            className="rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => addConditionToRule(index)}
-                      className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                      disabled={!hasPricingAttributes}
-                    >
-                      + Add Condition
-                    </button>
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {priceType === 0 ? 'Price' : 'Rate per item'}
-                    </label>
-                    <input type="number" min="0" step="0.01" value={rule.unitPrice} onChange={(e) => updateRule(index, { unitPrice: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
-                  </div>
-                  <div className="md:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                    <input type="number" min="1" value={rule.priority} onChange={(e) => updateRule(index, { priority: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" disabled={!hasPricingAttributes || !hasCompleteConditions} />
-                  </div>
-                  <div className="md:col-span-1">
-                    <button type="button" onClick={() => removeRule(index)} disabled={!hasPricingAttributes} className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
-                  </div>
-                  <div className="md:col-span-12">
-                    {!hasCompleteConditions ? (
-                      <p className="text-xs text-amber-700">
-                        Complete selected pricing-attribute conditions first, then set unit price.
-                      </p>
-                    ) : null}
-                    <p className="text-xs text-gray-500">
-                      Rule Name (auto):{' '}
-                      {ruleNameTokens.length > 0
-                        ? buildUniqueRuleName(ruleNameTokens, new Set<string>())
-                        : 'Select at least one attribute and value'}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Selected:{' '}
-                      {rule.conditions
-                        .map((condition) => {
-                          if (condition.attributeId === '' || condition.attributeValueId === '') return null;
-                          const attribute = getAttributeById(condition.attributeId);
-                          const value = attribute?.AttributeValues.find(
-                            (item) => item.ValueID === condition.attributeValueId,
-                          );
-                          if (!attribute || !value) return null;
-                          return `${attribute.AttributeName}: ${value.ValueName}`;
-                        })
-                        .filter((item): item is string => Boolean(item))
-                        .join(', ') || 'No conditions selected'}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-end">
-            <button type="button" onClick={handleSavePricing} disabled={savingPricing} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              {savingPricing ? 'Saving...' : 'Save Pricing Rules'}
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Product Media</h2>
-          {canManageMedia ? (
-            <>
-              <p className="text-sm text-gray-600">
-                Upload multiple images and videos for Generic Matrix products.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Upload Images</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => uploadMediaFiles(e.target.files, 0)}
-                    className="w-full text-sm"
-                    disabled={uploadingImageMedia || loadingMedia}
-                  />
-                  <p className="text-xs text-gray-500">JPEG, PNG, WEBP and other image mime types.</p>
-                </div>
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Upload Videos</label>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    multiple
-                    onChange={(e) => uploadMediaFiles(e.target.files, 1)}
-                    className="w-full text-sm"
-                    disabled={uploadingVideoMedia || loadingMedia}
-                  />
-                  <p className="text-xs text-gray-500">MP4, MOV and other video mime types.</p>
-                </div>
-              </div>
-
-              {loadingMedia ? (
-                <p className="text-sm text-gray-500">Loading media...</p>
-              ) : mediaItems.length === 0 ? (
-                <p className="text-sm text-gray-500">No media uploaded yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {mediaItems.map((item) => {
-                    const isImage = Number(item.MediaType) === 0;
-                    return (
-                      <div key={item.ProductMediaId} className="rounded-xl border border-gray-100 p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-medium text-gray-800">
-                            {isImage ? 'Image' : 'Video'} {item.IsPrimary ? '(Primary)' : ''}
-                          </div>
-                          <div className="text-xs text-gray-500">Sort: {item.SortOrder}</div>
-                        </div>
-                        {isImage ? (
-                          <img
-                            src={item.MediaUrl}
-                            alt={item.FileName || 'Product media'}
-                            className="h-40 w-full rounded-lg object-cover border border-gray-200"
-                          />
-                        ) : (
-                          <video
-                            src={item.MediaUrl}
-                            controls
-                            className="h-40 w-full rounded-lg border border-gray-200 bg-black"
-                          />
-                        )}
-                        <div className="text-xs text-gray-600 truncate" title={item.FileName || ''}>
-                          {item.FileName || 'Unnamed file'}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!item.IsPrimary ? (
-                            <button
-                              type="button"
-                              onClick={() => setPrimaryMedia(item.ProductMediaId)}
-                              className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
-                            >
-                              Set Primary
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => deleteMedia(item.ProductMediaId, item.FileName)}
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-amber-700">
-              Media management is available only for products with Pricing Strategy = Generic Matrix (0).
-            </p>
-          )}
-          {mediaMessage ? (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {mediaMessage}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Upload Policy & Info Items</h2>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Is upload mandatory?</label>
-            <div className="flex items-center gap-4">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input type="radio" name="upload-mandatory-edit" checked={isUploadMandatory} onChange={() => setIsUploadMandatory(true)} />
-                Yes
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input type="radio" name="upload-mandatory-edit" checked={!isUploadMandatory} onChange={() => setIsUploadMandatory(false)} />
-                No
-              </label>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Minimum uploads</label>
-              <input type="number" min="0" value={minUploads} onChange={(e) => setMinUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Maximum uploads</label>
-              <input type="number" min="0" value={maxUploads} onChange={(e) => setMaxUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <input
-                type="checkbox"
-                checked={enableOrderQuantity}
-                onChange={(e) => setEnableOrderQuantity(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Allow customer to choose order quantity on storefront
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Minimum order quantity</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={minOrderQuantity}
-                  onChange={(e) => setMinOrderQuantity(e.target.value)}
-                  disabled={!enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                  placeholder="1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Maximum order quantity</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={maxOrderQuantity}
-                  onChange={(e) => setMaxOrderQuantity(e.target.value)}
-                  disabled={!enableOrderQuantity}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                  placeholder="10"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <input
-                type="checkbox"
-                checked={enableCustomDescription}
-                onChange={(e) => {
-                  const nextEnabled = e.target.checked;
-                  setEnableCustomDescription(nextEnabled);
-                  if (!nextEnabled) setIsCustomDescriptionRequired(false);
-                }}
-                className="rounded border-gray-300"
-              />
-              Show custom description/instructions box on storefront
-            </label>
-
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={isCustomDescriptionRequired}
-                onChange={(e) => setIsCustomDescriptionRequired(e.target.checked)}
-                disabled={!enableCustomDescription}
-                className="rounded border-gray-300"
-              />
-              Make this field required
-            </label>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Field label</label>
-                <input
-                  value={customDescriptionLabel}
-                  onChange={(e) => setCustomDescriptionLabel(e.target.value)}
-                  placeholder="Description / Instructions"
-                  disabled={!enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Placeholder</label>
-                <input
-                  value={customDescriptionPlaceholder}
-                  onChange={(e) => setCustomDescriptionPlaceholder(e.target.value)}
-                  placeholder="Add any notes for production (optional)"
-                  disabled={!enableCustomDescription}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Allowed document types</label>
-            {documentTypes.length === 0 ? (
-              <p className="text-sm text-gray-500">No document types available from master data.</p>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {documentTypes.map((type) => (
-                  <label key={type.DocumentTypeId} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={allowedDocumentTypeIds.includes(type.DocumentTypeId)}
-                      onChange={() => toggleAllowedDocumentType(type.DocumentTypeId)}
-                    />
-                    {type.Code} ({type.Extension})
+            <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Upload Policy & Info Items</h2>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Is upload mandatory?</label>
+                <div className="flex items-center gap-4">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="radio" name="upload-mandatory-edit" checked={isUploadMandatory} onChange={() => setIsUploadMandatory(true)} />
+                    Yes
                   </label>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="radio" name="upload-mandatory-edit" checked={!isUploadMandatory} onChange={() => setIsUploadMandatory(false)} />
+                    No
+                  </label>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Minimum uploads</label>
+                  <input type="number" min="0" value={minUploads} onChange={(e) => setMinUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Maximum uploads</label>
+                  <input type="number" min="0" value={maxUploads} onChange={(e) => setMaxUploads(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                </div>
+              </div>
+
+              {multiplierMode === 'upload_count' && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 mt-4">
+                  <p className="text-sm font-medium text-gray-800">Pricing Configuration Health</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    {pricingHealthChecks.map((item) => (
+                      <div key={item.label} className={item.valid ? 'text-emerald-700' : 'text-red-600'}>
+                        {item.valid ? 'PASS' : 'FAIL'}: {item.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={enableOrderQuantity}
+                    onChange={(e) => setEnableOrderQuantity(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Allow customer to choose order quantity on storefront
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Minimum order quantity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={minOrderQuantity}
+                      onChange={(e) => setMinOrderQuantity(e.target.value)}
+                      disabled={!enableOrderQuantity}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                      placeholder="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Maximum order quantity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={maxOrderQuantity}
+                      onChange={(e) => setMaxOrderQuantity(e.target.value)}
+                      disabled={!enableOrderQuantity}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                      placeholder="10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={enableCustomDescription}
+                    onChange={(e) => {
+                      const nextEnabled = e.target.checked;
+                      setEnableCustomDescription(nextEnabled);
+                      if (!nextEnabled) setIsCustomDescriptionRequired(false);
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  Show custom description/instructions box on storefront
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isCustomDescriptionRequired}
+                    onChange={(e) => setIsCustomDescriptionRequired(e.target.checked)}
+                    disabled={!enableCustomDescription}
+                    className="rounded border-gray-300"
+                  />
+                  Make this field required
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Field label</label>
+                    <input
+                      value={customDescriptionLabel}
+                      onChange={(e) => setCustomDescriptionLabel(e.target.value)}
+                      placeholder="Description / Instructions"
+                      disabled={!enableCustomDescription}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Placeholder</label>
+                    <input
+                      value={customDescriptionPlaceholder}
+                      onChange={(e) => setCustomDescriptionPlaceholder(e.target.value)}
+                      placeholder="Add any notes for production (optional)"
+                      disabled={!enableCustomDescription}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Allowed document types</label>
+                {documentTypes.length === 0 ? (
+                  <p className="text-sm text-gray-500">No document types available from master data.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {documentTypes.map((type) => (
+                      <label key={type.DocumentTypeId} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={allowedDocumentTypeIds.includes(type.DocumentTypeId)}
+                          onChange={() => toggleAllowedDocumentType(type.DocumentTypeId)}
+                        />
+                        {type.Code} ({type.Extension})
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">Info items</label>
+                  <button type="button" onClick={addInfoItem} className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">+ Add Info Item</button>
+                </div>
+                {infoItems.map((item) => (
+                  <div key={item.key} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3">
+                    <div className="md:col-span-12 lg:col-span-3">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                      <input value={item.title} onChange={(e) => updateInfoItem(item.key, { title: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    </div>
+                    <div className="md:col-span-12 lg:col-span-5">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
+                      <input value={item.value} onChange={(e) => updateInfoItem(item.key, { value: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    </div>
+                    <div className="md:col-span-6 lg:col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Sort Order</label>
+                      <input type="number" min="1" value={item.sortOrder} onChange={(e) => updateInfoItem(item.key, { sortOrder: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    </div>
+                    <div className="md:col-span-6 lg:col-span-2">
+                      <button type="button" onClick={() => removeInfoItem(item.key)} disabled={infoItems.length === 1} className="w-full rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">Info items</label>
-              <button type="button" onClick={addInfoItem} className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">+ Add Info Item</button>
-            </div>
-            {infoItems.map((item) => (
-              <div key={item.key} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end rounded-xl border border-gray-100 p-3">
-                <div className="md:col-span-4">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-                  <input value={item.title} onChange={(e) => updateInfoItem(item.key, { title: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                </div>
-                <div className="md:col-span-5">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
-                  <input value={item.value} onChange={(e) => updateInfoItem(item.key, { value: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Sort Order</label>
-                  <input type="number" min="1" value={item.sortOrder} onChange={(e) => updateInfoItem(item.key, { sortOrder: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                </div>
-                <div className="md:col-span-1">
-                  <button type="button" onClick={() => removeInfoItem(item.key)} disabled={infoItems.length === 1} className="w-full rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
-                </div>
+              <div className="flex flex-wrap justify-end items-center gap-3">
+                {metaMessage && <span className="text-sm font-medium text-green-600">{metaMessage}</span>}
+
+                <button type="button" onClick={handleSaveMetaConfig} disabled={savingMeta || loadingMeta} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {savingMeta ? 'Saving...' : 'Save Upload Policy & Info'}
+                </button>
               </div>
-            ))}
+            </div>
+
+            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           </div>
-          <div className="flex justify-end">
-            <button type="button" onClick={handleSaveMetaConfig} disabled={savingMeta || loadingMeta} className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              {savingMeta ? 'Saving...' : 'Save Upload Policy & Info'}
+
+          <ProductPreviewModal
+            productName={productName}
+            description={description}
+            attributes={attributes}
+            minUploads={minUploads}
+            maxUploads={maxUploads}
+            primaryImageUrl={mediaItems.find(m => m.IsPrimary && Number(m.MediaType) === 0)?.MediaUrl}
+            enableOrderQuantity={enableOrderQuantity}
+            minOrderQuantity={minOrderQuantity}
+            maxOrderQuantity={maxOrderQuantity}
+            enableCustomDescription={enableCustomDescription}
+            customDescriptionLabel={customDescriptionLabel}
+            customDescriptionPlaceholder={customDescriptionPlaceholder}
+            documentTypes={documentTypes}
+            allowedDocumentTypeIds={allowedDocumentTypeIds}
+            infoItems={infoItems}
+            rules={rules}
+            savedAttributes={savedAttributes}
+            isOpenOnMobile={showMobilePreview}
+            onCloseMobile={() => setShowMobilePreview(false)}
+          />
+
+          {/* Floating Preview Button for Mobile */}
+          <div className="fixed bottom-6 right-6 z-40 xl:hidden">
+            <button
+              onClick={() => setShowMobilePreview(true)}
+              className="flex items-center gap-1.5 bg-slate-900 text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium active:scale-95 transition-transform"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview
             </button>
           </div>
         </div>
-
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        {basicsMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{basicsMessage}</div>}
-        {attributesMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{attributesMessage}</div>}
-        {pricingMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{pricingMessage}</div>}
-        {metaMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{metaMessage}</div>}
       </div>
+      <Toaster position="bottom-right" />
     </ProtectedRoute>
   );
 }
